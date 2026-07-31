@@ -2,146 +2,148 @@
 
 ## English
 
-This Skill can rename and move files that matter to you. I built it to be cautious, but it still depends on an Agent interpreting content, context, permissions, and your answers. Please read this page before using it on real folders.
+This Skill can change the names and locations of files that matter to you. I designed it to stop and ask when the answer is unclear, but no set of rules can understand every folder exactly as its owner does. Please read this page before using the Skill on real files.
 
-### Start with a backup and a small scope
+### Before you start
 
-Keep a backup that is separate from the folder you plan to organize, and check that you can open it. A copy inside the same folder is not enough because a move, sync operation, permission change, or disk problem can affect both.
+Make a separate backup and open a few files from it. A copy inside the folder you are about to organize is not enough: the same move, sync problem, permission change, or disk failure could affect both.
 
-Begin with a small, representative set of files. Use preview mode first. Read the proposed source and destination paths, renames, package decisions, version decisions, and duplicate decisions. Confirm the full preview after each action makes sense to you. If the preview contains an unreadable file, an unexpected category, an unclear duplicate, or a path you do not recognize, stop and resolve it before applying changes.
+Start with a small folder that represents the larger problem. Stay in preview mode until you have checked every source, destination, rename, version decision, and duplicate decision. If anything is unreadable, unfamiliar, or hard to explain, leave it in place and resolve it first.
 
-### Classification can differ from your expectations
+### Classification is a judgment
 
-The Skill looks at file content, nearby material, the original folder, formal metadata, and the way you say you retrieve files. Those clues can still support more than one reasonable answer. Your occupation or role helps the Agent ask better questions; it does not prove where a file belongs.
+The Skill uses the file itself, nearby material, the original folder, formal metadata, and the way you say you look for things. Those clues can point to more than one sensible answer. A category can follow the rules and still be wrong for your habits.
 
-A result can follow the rules and still feel wrong for the way you work. Review the proposed structure as a person who will need to find the material six months from now. Keep uncertain files in place until you have chosen an interpretation.
+Review the plan as the person who will need the file months from now. Your occupation helps the Agent ask better questions, but it does not prove where a file belongs. When the evidence is weak, the file should stay where it is.
 
-### A missing original path does not always mean a deleted file
+### A file may leave its old path without being deleted
 
-After an approved run, a file may have a new name or a new location. Its old path will no longer exist even though the file remains available elsewhere. Check the confirmed preview, the main index, and the destination path before concluding that the file was erased.
+An approved run can rename a file or move it elsewhere. After that, the old path no longer exists, even though the file is still available at the confirmed destination. Check the preview, main index, and destination before deciding that a file has been lost.
 
-The same point applies to version handling. The built-in organizer moves a confirmed old version into the configured history area. It does not delete that unique old version.
+The same applies to old versions. When the relationship is clear and you approve it, the built-in organizer moves the older version into the history area. It does not delete that unique file.
 
-### Exact duplicates can remove one original path
+### What deduplication can remove
 
-The built-in organizer does not delete a unique file. It can, however, consolidate an ordinary exact duplicate under a narrow set of conditions:
+The built-in organizer does not delete unique files. It may reduce two duplicate files to one only when all of the following are true:
 
-- you gave explicit authorization for the `deduplicate` action;
-- you reviewed and confirmed the complete preview;
+- you explicitly allowed `deduplicate`;
+- you reviewed and confirmed the full preview;
 - the organizer is running with `--apply`;
-- both files have the same SHA-256 value, which means their bytes are identical;
-- the files have the same ordinary use and neither needs to remain in a protected context.
+- both files have the same SHA-256 value, so their contents match byte for byte;
+- both files serve the same purpose and neither needs to remain inside a protected package or folder.
 
-When all of those conditions hold, the organizer may keep one file and remove the other duplicate from its original path. Depending on which copy has the newer modification time, it may keep the existing indexed copy or replace it with the other byte-identical copy. The result is one retained file, not two.
+When all five conditions are met, one copy remains and the other is removed from its original location. The organizer uses modification time to decide whether to keep the indexed copy or replace it with the other identical copy. Either way, the result is one file rather than two.
 
-Files inside formal submission packages, meeting packages, evidence packages, reporting packages, exports, reference contexts, or runtime directories may need to remain in more than one place even when their bytes match. The organizer preserves those contextual copies when an exact protected boundary or a confirmed relative path establishes the context. If two nested paths have the same content but their purposes are unclear, the files stay in place for your decision.
+Identical content does not always mean that one copy is needless. The same file may belong in a formal submission, meeting pack, evidence pack, report, export, reference set, or runtime directory.
 
-SHA-256 equality proves byte equality. It does not prove that two paths serve the same purpose. Do not approve deduplication until the preview explains both.
+The organizer keeps each copy when a confirmed package boundary or relative path shows why it is needed. If the purpose is unclear, both files stay in place for you to decide.
 
-### This is not a backup or recovery tool
+A matching SHA-256 proves that the contents are identical. It does not prove that the two paths have the same purpose. Do not approve deduplication unless the preview explains both.
 
-The Skill organizes files and writes an index. It does not create a dependable backup, restore a damaged disk, recover a file removed outside its workflow, or replace your version-control and retention practices. The history area is part of the organized file tree; it is not an independent backup.
+### This Skill is not a backup or recovery tool
 
-Keep using the backup system that fits your files. That may be a versioned cloud service, an external drive, an organization-managed repository, or another tested method. Make sure the backup is complete before an applied run.
+The Skill organizes files and writes an index. It does not make a dependable backup, repair a disk, recover a file removed outside its own workflow, or replace version control and retention rules. The history area is still part of the organized folder, so it is not an independent backup.
 
-### Sync, shared folders, and permissions add risk
+Use a backup method you trust, such as a versioned cloud service, an external drive, or an organization-managed repository. Make sure the backup has finished before running `--apply`.
 
-Cloud sync can carry a rename, move, or duplicate consolidation to every connected device. Wait for active uploads and downloads to finish before you start. Cloud-only placeholders, partially downloaded files, and sync conflicts can make content unreadable or produce a stale view of a folder.
+### Cloud sync, shared folders, and permissions
 
-Changes in a shared folder can affect colleagues and may break links, shortcuts, automations, or agreed package structures. Confirm that you have write permission and that the proposed changes follow the team's rules. A personal preference does not override a shared convention.
+A rename, move, or deduplication may sync to every connected device. Wait for uploads and downloads to finish before you begin. Cloud-only placeholders, incomplete downloads, and sync conflicts can hide content from the Agent or show it an outdated folder.
 
-Installing the Skill does not grant file access. The Agent, operating system, sync provider, and storage location each enforce their own permissions. A preview from one permission context does not authorize a later run under another.
+Changes in a shared folder can affect other people. They may also break links, shortcuts, automations, or an agreed package structure. Check that you have write permission and that the plan follows the team's rules.
 
-### Interruptions and concurrent changes
+Installing the Skill does not grant access to files. The Agent, operating system, sync provider, and storage service each apply their own permissions. A preview made with one set of permissions is not approval to run later with broader access.
 
-An interruption can stop an applied run after some actions have finished. A file can also change after preview if another person, application, or sync service edits the folder. Inspect the current paths and index before you run `--apply` again, then generate a new preview and confirm the remaining work.
+### Interruptions and changes during a run
 
-Close applications that are editing the same files when practical. Pause if the source changes between preview and execution, if a destination already contains different content, or if the verification counts and hashes do not match.
+If a run stops halfway through, some changes may already be complete while others are not. A person, application, or sync service may also change the folder after the preview was made.
 
-### Monitoring needs separate consent
+Before running `--apply` again, check the current paths and index, make a new preview, and approve only the work that remains. Pause if the source has changed, the destination contains different content, or the final counts and hashes do not match.
 
-One approved organization job does not authorize background monitoring. Enabling the inbox monitor requires a separate decision. Login autostart requires a successful real delivery test and another confirmation. Review the monitor's scope with the same care as a manual run because it can act while you are not watching the folder.
+### Monitoring is a separate choice
 
-### Privacy and confidential material
+Approving one run does not include background monitoring. The inbox monitor must be enabled separately for a confirmed root. Login autostart needs a successful real delivery test and another confirmation. Review its scope carefully because it may act when you are not watching the folder.
 
-Your Agent provider determines how it handles file content. Check the privacy, data-retention, and network behavior of the Agent you use. Do not put confidential documents, credentials, private paths, or organization names into an issue or pull request. Use synthetic examples when reporting a problem.
+### Privacy
+
+How file contents are handled depends on the Agent service you use. Check its privacy policy, data-retention rules, and network behavior. Never attach confidential documents, credentials, private paths, or real organization names to an issue or pull request. Use synthetic examples instead.
 
 ### License and responsibility
 
-This project is released under the MIT License and provided "as is", without warranty. The license text in [LICENSE](LICENSE) controls. You remain responsible for choosing the scope, keeping a backup, reviewing the preview, confirming permissions, and deciding whether the proposed changes are acceptable.
+This project is released under the MIT License and provided “as is,” without warranty. The text in [LICENSE](LICENSE) controls. You are responsible for choosing the scope, keeping a backup, checking the preview and permissions, and deciding whether the proposed changes are acceptable.
 
-This Skill is not a substitute for records-management policy, legal advice, forensic preservation, or a disaster-recovery system. If a folder is subject to legal hold, audit requirements, formal retention rules, or another controlled process, follow that process and do not apply an automated reorganization without approval.
+This Skill is not a substitute for records-management rules, legal advice, forensic preservation, or disaster recovery. If files are under legal hold, audit requirements, formal retention rules, or another controlled process, follow that process and do not reorganize them without approval.
 
 ---
 
 ## 中文
 
-这个 Skill 会接触真正重要的文件，也可能在得到授权后改名、移动或合并普通重复项。我在设计时尽量把判断做得保守，但它仍然要依赖 Agent 对正文、上下文、权限和使用者回答的理解。正式处理文件前，请先读完本页。
+这个 Skill 会接触重要文件，也可能在确认后给文件改名、换位置。我在设计时尽量让它遇到疑问就停下来，但再细的规则也不可能完全理解每个人的文件习惯。正式使用前，请先读完本页。
 
-### 先留好备份，再从小范围试起
+### 开始前先做两件事
 
-请先准备一份与待整理目录相互独立的备份，并实际确认文件能够打开。把副本放在同一个待整理文件夹里不算可靠备份，因为移动、同步、权限变化或磁盘故障可能同时影响两份文件。
+先准备一份独立备份，并从备份中打开几份文件，确认它确实可用。把副本放在待整理文件夹里并不可靠，因为移动、同步、权限变化或磁盘故障可能同时影响两份文件。
 
-第一次不要直接处理大范围资料。选一小批有代表性的文件，保持预演模式，逐项查看原路径、新路径、改名结果、正式包判断、版本处理和重复项处理。只有每一项都符合预期时，才确认完整预览。预览中只要出现不可读文件、陌生分类、用途说不清的重复项，或自己不认识的路径，就应先停下来处理这些问题。
+第一次只选一个有代表性的小文件夹。先保持预演模式，逐项核对原位置、新位置、改名、版本和重复文件处理。只要有文件读不了、路径不认识，或者某项判断说不清，就先不要执行。
 
-### 分类结果可能不符合个人习惯
+### 分类结果可能和你的想法不同
 
-Skill 会参考正文、相邻材料、原文件夹、正式元数据和使用者平时的查找方式，但同一组证据有时能支持两种合理解释。职业和岗位只帮助 Agent 把问题问得更贴近实际，并不能直接证明文件应该放在哪里。
+Skill 会参考文件正文、相邻材料、原文件夹、正式元数据，以及你平时的查找方式。同一组线索有时能得出两种都说得通的答案。分类符合规则，不代表一定符合你的习惯。
 
-一套分类在逻辑上说得通，也可能不适合本人日后的查找习惯。审阅方案时，不妨设想半年后要重新找到这些材料。暂时说不清的文件应继续留在原位，等本人选定解释后再处理。
+审阅方案时，可以想一想几个月后会怎样重新找到这些材料。职业和岗位只帮助 Agent 把问题问得更准确，不能直接证明文件该放在哪里。证据不足时，文件应该继续留在原处。
 
-### 原路径找不到，不一定是文件被删了
+### 原位置找不到，不一定是文件被删了
 
-执行经确认的方案后，文件可能换了名称或位置。旧路径会随之失效，但文件仍在新位置。发现原路径找不到时，应先核对已确认的预览、主索引和目标路径，再判断文件是否真的丢失。
+执行确认过的方案后，文件可能换了名称，也可能去了新的位置。旧路径会失效，但文件仍在已经确认的目标位置。发现原处没有文件时，请先核对预览、主索引和新位置。
 
-版本处理也是如此。内置整理器发现关系明确的旧版本时，只会把它移入配置中的历史区，不会删除这份独有的旧文件。
+旧版本也是这样。版本关系明确并经过确认后，内置整理器会把旧版本移入历史区，不会删除这份独有文件。
 
-### 普通完全重复项可能少一个原路径
+### 去重会怎样处理文件
 
-内置整理器不会删除独有文件，但在条件严格满足时，它会合并普通的完全重复项：
+内置整理器不会删除独有文件。只有同时满足以下条件，它才可能把两份重复文件合并为一份：
 
-- 使用者明确授权了 `deduplicate`；
-- 完整预览已经逐项确认；
+- 你明确允许 `deduplicate`；
+- 你已经看过并确认完整预览；
 - 整理器以 `--apply` 执行；
-- 两份文件的 SHA-256 一致，即逐字节完全相同；
-- 两份文件用途相同，且都不需要作为受保护的情境副本保留。
+- 两份文件的 SHA-256 相同，也就是内容逐字节一致；
+- 两份文件用途相同，而且都不需要留在特定材料包或目录中。
 
-这些条件全部满足后，整理器可能只留一份，另一份文件的原路径会消失。它会根据修改时间决定保留已有索引中的副本，还是用另一份逐字节相同的文件替换它。最终结果是一份文件，而不是两份。
+五项条件全部满足后，系统会保留其中一份，另一份会从原来的位置移除。整理器会参考修改时间，决定保留已经写入索引的副本，还是用另一份相同文件替换它。最终只剩一份文件。
 
-正式提交包、会议包、证据包、报送包、导出包、参考情境和运行目录中的相同文件，可能为了结构完整或追溯需要保留在多个位置。只有精确保护边界或本人确认的相对路径能够证明这种用途时，整理器才会自动保留情境副本。两处嵌套路径内容相同但用途关系不清时，文件保持原位，交给本人选择。
+内容相同，不一定代表其中一份多余。同一文件可能分别属于正式提交包、会议包、证据包、报送包、导出包、参考资料或程序运行目录。只要已经确认的材料包边界或相对路径能够说明每份文件的用途，系统就会把它们都留下。用途说不清时，两份文件都先不动。
 
-SHA-256 一致只能证明内容完全相同，不能证明两个路径承担相同用途。预览没有解释清楚两份文件的情境时，不要批准去重。
+SHA-256 相同只能证明内容一致，不能证明两个路径用途相同。如果预览没有把两份文件的用途解释清楚，请不要批准去重。
 
-### Skill 不是备份或恢复工具
+### Skill 不能代替备份和恢复工具
 
-它负责整理文件并写入索引，不能代替可靠备份，也不能修复损坏的磁盘、恢复在流程之外被移除的文件，或取代原有的版本管理与留存制度。历史区仍在整理后的文件树中，不是一份独立备份。
+它负责整理文件并写入索引，不能修复磁盘，也不能找回在流程之外被移除的文件，更不能取代原有的版本管理和留存制度。历史区仍在整理后的文件夹中，不是一份独立备份。
 
-请继续使用适合自己资料的备份方式，例如带版本记录的云服务、外置硬盘、单位管理的资料库，或其他经过恢复验证的方法。执行前应确认备份已经完整完成。
+请继续使用可靠的备份方式，例如带版本记录的云服务、外置硬盘或单位管理的资料库。运行 `--apply` 前，要确认备份已经完成。
 
-### 同步、共享目录和权限会增加风险
+### 云同步、共享文件夹和权限
 
-云同步会把改名、移动或重复项合并传到其他设备。开始前应等待上传和下载结束。云端占位、未下载完成的文件和同步冲突都可能导致内容暂时不可读，也可能让 Agent 看到过期的目录状态。
+改名、移动或去重可能同步到所有连接设备。开始前，请等待上传和下载结束。云端占位文件、尚未下载完成的文件和同步冲突，可能让内容暂时无法读取，也可能让 Agent 看到已经过时的目录。
 
-共享目录中的改动还会影响同事，可能使链接、快捷方式、自动化流程或约定的材料包结构失效。执行前应确认本人具有写入权限，方案也符合团队规则。个人习惯不能覆盖共享约定。
+共享文件夹中的改动会影响其他人，还可能让链接、快捷方式、自动化流程或约定的材料包结构失效。请先确认自己有写入权限，整理方案也符合团队规则。
 
-安装 Skill 本身不会授予文件权限。Agent、操作系统、同步服务和存储位置各自有权限控制。在一种权限环境下生成的预览，不能自动授权另一种环境下的执行。
+安装 Skill 不等于获得文件权限。Agent、操作系统、同步服务和存储服务各有自己的权限控制。在一套权限下做过预览，不代表换成更高权限后可以直接执行。
 
-### 中断和并发修改
+### 执行中断或文件又被修改
 
-执行中断可能留下只完成一部分的状态。预览完成后，其他人员、应用或同步服务也可能继续修改文件夹。不要不加检查地再次运行 `--apply`。应先查看当前路径和索引，重新生成预览，再确认剩余操作。
+如果执行到一半被打断，文件夹可能处于“改了一部分，还有一部分没改”的状态。预览完成后，其他人、应用或同步服务也可能继续修改文件。
 
-条件允许时，先关闭正在编辑同一批文件的应用。若来源在预览后发生变化、目标位置已有不同内容，或验收时的数量和哈希不一致，应立即暂停。
+再次运行 `--apply` 前，请先核对当前路径和索引，重新生成预览，只确认剩余的操作。如果来源已经变化、目标位置出现不同内容，或者最终数量和哈希对不上，应立即暂停。
 
-### 后台监控需要另行同意
+### 后台监控需要单独同意
 
-一次整理授权不包含后台监控。启用投放箱监控需要单独决定；设置登录自启动前，还要先完成一次真实投递测试，并再次确认。监控可能在无人查看文件夹时执行操作，因此它的范围也应像手工执行一样认真核对。
+同意整理一次，不等于同意长期监控文件夹。投放箱监控必须针对已确认的根目录另行启用。设置登录自启动前，还要完成一次真实投递测试并再次确认。监控可能在无人查看时执行，因此也要认真核对它的范围。
 
-### 隐私和保密资料
+### 隐私
 
-本仓库无法决定所使用的 Agent 如何处理文件正文。请自行了解 Agent 服务的隐私、数据留存和联网方式。提交 Issue 或 Pull Request 时，不要附上机密文件、凭据、个人路径或单位名称；复现问题请使用合成样本。
+文件内容怎样被处理，取决于所使用的 Agent 服务。请先了解它的隐私政策、数据留存方式和联网情况。提交 Issue 或 Pull Request 时，不要附上机密文件、凭据、个人路径或真实单位名称；复现问题请使用合成样本。
 
 ### 许可与责任
 
-本项目采用 MIT 许可，并按“现状”提供，不作任何担保，具体以 [LICENSE](LICENSE) 为准。使用者仍需自行决定整理范围，保留备份，审阅完整预览，确认权限，并判断每项操作是否可以接受。
+本项目采用 MIT 许可，并按“现状”提供，不作任何担保，具体以 [LICENSE](LICENSE) 为准。使用者需要自行决定整理范围、保留备份、核对预览和权限，并判断每项改动是否可以接受。
 
-本 Skill 不能代替档案管理制度、法律意见、取证保全或灾难恢复系统。若资料受诉讼保全、审计要求、正式留存期限或其他受控流程约束，请遵循相应制度，未经批准不要执行自动整理。
+本 Skill 不能代替档案管理制度、法律意见、取证保全或灾难恢复系统。如果资料受诉讼保全、审计、正式留存期限或其他受控流程约束，请遵守相应制度，未经批准不要自动整理。
