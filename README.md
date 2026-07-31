@@ -1,6 +1,6 @@
 # organize-files-by-content
 
-An Agent Skill that sorts files by purpose, existing folders, and the way you look for things. It shows every proposed change before it touches a file. The opening questions use your job information, then the Agent builds a plan from the files and your existing habits.
+An Agent Skill that organizes files around their purpose, existing structure, and the way you look for them. It shows every proposed change before it touches a file.
 
 Current version: `1.3.1`
 
@@ -18,9 +18,13 @@ Current version: `1.3.1`
 
 I’m new to building Agent Skills, and this is my first one. I tried it with a few people in different professions; the results were encouraging, so I’m taking the liberty of sharing it here in the hope that it helps others.
 
-I made it for folders that have grown through daily work. Once files pile up, names alone stop being useful. The original folder, nearby files, and document text often explain why something was kept and where someone will look for it later.
+I built this Skill for a familiar kind of office clutter. A file arrives in a work chat and another as an email attachment. A meeting leaves behind several temporary versions. The next task is waiting, so they land on the Desktop or in Downloads. When you return to the folder, even starting means making dozens of small decisions, so you put it off again.
 
-The Skill asks about those habits before reading the locations you approve. It then prepares a full list of proposed changes for you to review.
+Even a disorderly folder can make sense to the person who uses it. You may remember that the signed copy is somewhere on the right side of the Desktop, or that last month's proposal sits beside the meeting notes. A tool can replace that half-remembered layout with a tidy structure that feels unfamiliar. A job title rarely describes how the work is divided. People with the same title may support different teams and do different work.
+
+This Skill asks a few simple questions at the start. When you look for an old file, do you think first of the project, what it was for, the person involved, or the date? It then considers where the file already sits, what is beside it, and what the document is used for. Your occupation and role help the Agent choose questions that fit your work. The Agent does not turn a job title into the folder tree.
+
+The Skill keeps any useful pattern in the old folders. If there is no pattern to follow, it offers a few cautious ways to begin and shows how each would work on a small group of files. It shows every change before it moves anything, and uncertain files stay in place. I want it to turn a folder you have put off for too long into an arrangement you still recognise and will keep using.
 
 ### How it works
 
@@ -148,9 +152,13 @@ Issues and pull requests are welcome. Please include a small synthetic example, 
 
 我是 Skill 新人，这是我做的第一个 Skill。找了几位不同职业的朋友做过试用，整体表现尚可，所以斗胆公开出来，希望能给大家一点帮助。
 
-我做这个 Skill，是因为资料一多，文件名很快就不够用了。有些名称写得很随意，有些已经过时；要弄清文件的用途，往往得连同原目录、相邻材料和正文一起看。
+我做这个 Skill，是因为文件常常在忙乱中越积越多：微信里下载一份文件，邮件里收一份附件，开完会又多出几个临时版本。手头还有事，先放桌面或下载目录，想着忙完再整理。可一件事刚结束，下一件又来了。等文件堆到一定程度，光是想到要逐个打开、判断、改名、归位，就已经不想动了。
 
-使用时，Skill 会先问几个和查找习惯有关的问题，再查看明确授权的目录。所有改名、移动和去重安排都会列进预览，确认后再执行。
+目录虽然乱，自己往往还记得个大概：某份盖章件在桌面右边，上个月的方案和会议纪要放在一起。工具如果换上一套陌生目录，这点把握也没有了。职业名称也概括不了日常工作。同一个职位，在不同团队里负责的事情可能差得很远。
+
+这个 Skill 开始时会问几个简单问题：平时找材料，会先想项目、用途、相关的人或单位，还是时间？随后再看文件原来放在哪里、旁边有哪些材料、正文讲的是什么；有几种放法都说得通时，由本人选择。职业和职位会影响问题怎么问，Agent 不会据此直接套目录。
+
+原有目录有一套能用的思路，就尽量沿用。确实没有规律时，再给出几种稳妥的分法，先拿一小部分文件预览效果。所有变化都会完整列出来，确认后才执行；拿不准的文件留在原处。我希望它能把已经堆到不想动的文件，整理成你自己仍然认得、以后也愿意继续用的样子。
 
 ### 整理时会看哪些信息
 
