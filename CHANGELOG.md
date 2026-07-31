@@ -1,5 +1,23 @@
 # Changelog / 变更记录
 
+## 1.3.2 - 2026-07-31
+
+### English
+
+Distribution-robustness release. The organizer itself is unchanged from 1.3.1.
+
+- The installation prompt no longer requires the `VERSION` file; when it is absent (for example on channels that strip extensionless files), the expected version is taken from the channel package metadata or the listing page.
+- On channels that do not include the `LICENSE` file, the disclaimer links to the LICENSE text in this repository instead of a package-local path.
+- Channel-specific metadata (for example the Tencent SkillHub listing fields) lives only in that channel's package and is not part of this repository.
+
+### 中文
+
+分发健壮性版本。整理器本体与 1.3.1 完全一致。
+
+- 安装提示词不再强依赖 `VERSION` 文件；该文件缺失时（例如不保留无扩展名文件的渠道），以渠道分包元数据或上架页面声明的版本为准。
+- 在不含 `LICENSE` 文件的渠道中，免责声明改为链接本仓库中的 LICENSE 文本，不再指向包内路径。
+- 各渠道专属元数据（例如腾讯 SkillHub 的上架字段）只存在于对应渠道的分发包，不进入本仓库。
+
 ## 1.3.1 - 2026-07-31
 
 ### English
