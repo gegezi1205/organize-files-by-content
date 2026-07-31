@@ -1,8 +1,16 @@
 # organize-files-by-content
 
+[![skills.sh](https://skills.sh/b/gegezi1205/organize-files-by-content)](https://skills.sh/gegezi1205/organize-files-by-content)
+
 An Agent Skill that organizes files around their purpose, existing structure, and the way you look for them. It shows every proposed change before it touches a file.
 
 Current version: `1.3.1`
+
+```bash
+npx skills add gegezi1205/organize-files-by-content
+```
+
+Installs with the [skills CLI](https://skills.sh/) into your agent's skills directory. Installing only copies the files; the Skill does nothing until you ask your agent to use it, and it never touches a real folder without your confirmed preview. / 安装只是把文件放进 skills 目录，不会自动运行；整理真实文件夹前一定先经过你确认的完整预览。
 
 > **Read the [disclaimer and safety notes](DISCLAIMER.md) before using real files. Keep a separate backup and start with a small folder.**
 >
