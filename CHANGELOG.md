@@ -1,5 +1,19 @@
 # Changelog / 变更记录
 
+## 1.3.3 - 2026-07-31
+
+### English
+
+Channel-copy alignment. The organizer is unchanged from 1.3.1.
+
+- The Tencent SkillHub listing summary now uses the repository's concise Chinese introduction instead of the longer channel-specific text.
+
+### 中文
+
+渠道文案对齐。整理器本体与 1.3.1 一致。
+
+- 腾讯 SkillHub 的上架简介改用仓库的简明中文介绍，替换此前较长的渠道文案。
+
 ## 1.3.2 - 2026-07-31
 
 ### English
