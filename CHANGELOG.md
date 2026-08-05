@@ -1,5 +1,25 @@
 # Changelog / 变更记录
 
+## 1.4.0 - 2026-08-05
+
+### English
+
+Multi-dimensional classification and counter-evidence release.
+
+- Each file is assessed across source role, business object, document type, responsibility flow, relationship level, retention purpose, stable context, time/version, and conflicting evidence.
+- Repeating the same signal in a title and body does not create two semantic dimensions.
+- A missing role-specific keyword does not prove that a file is an external reference, and a reference to a leadership speech does not establish that the document itself is a speech.
+- New evaluation and self-test cases cover these distinctions. GitHub and SkillHub now share version `1.4.0` and the same behavior while keeping channel-specific presentation metadata.
+
+### 中文
+
+多维分类与反证版本。
+
+- 每份材料分别判断来源角色、业务对象、材料体裁、责任流向、关联层级、留存用途、稳定上下文、时间版本和反证冲突。
+- 标题和正文重复同一信号，不算两个语义维度。
+- 缺少本岗位专业词不能证明材料属于外部参考；引用“领导讲话精神”也不能证明材料本身是讲话稿。
+- 增加对应评测与自测；GitHub 和 SkillHub 统一为 `1.4.0`，功能规则一致，渠道展示元数据仍各自保留。
+
 ## 1.3.3 - 2026-07-31
 
 ### English
