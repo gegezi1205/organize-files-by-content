@@ -4,7 +4,7 @@
 
 An Agent Skill that organizes files around their purpose, existing structure, and the way you look for them. It shows every proposed change before it touches a file.
 
-Current version: `1.4.0`
+Current version: `1.5.0`
 
 ```bash
 npx skills add gegezi1205/organize-files-by-content
@@ -46,6 +46,8 @@ The Agent checks:
 - the role of identical files inside packages, evidence sets, and other established folders.
 
 It also separates who produced the file, what it is about, what kind of document it is, how it relates to your work, why you keep it, and any evidence that conflicts. A repeated keyword is not treated as several independent clues, and a missing role-specific term does not by itself make a file an external reference.
+
+With explicit media authorization, ZIP and TAR archives are safely extracted with built-in checks, while 7Z and RAR use a detected `bsdtar` or 7-Zip tool. Consistent business packages remain together with the original archive and relative structure; conflicting packages stay intact for review. JPEG, PNG, and WebP text images are rotated only when four-way OCR has a clear winner, then renamed and re-hashed from the corrected content.
 
 The first questions take your job into account. The folder plan comes from the files, existing structure, and your answers.
 
@@ -90,6 +92,8 @@ Preview is the default. Before accepting `--apply`, the all-in-one organizer che
 One run may read, rename, move, write the index, and handle duplicates. The configuration therefore needs `read`, `rename`, `move`, and `deduplicate`. For a smaller permission set, remain in preview or ask the Agent to perform the approved actions without the all-in-one script.
 
 Ambiguous, unsupported, encrypted, damaged, syncing, cloud-only, and unreadable files stay where they are with a recorded reason. An unreadable file blocks a completion report.
+
+Archive extraction rejects absolute or escaping paths, links, special files, executable members, scripts, encryption, corruption, and fixed size limits. New schema 3 configurations use `00_待归档` and record separate authorization for archive extraction and text-image rotation. Existing schema 2 configurations keep their original inbox and continue to handle ordinary files without modifying media.
 
 The built-in organizer does not delete unique files. Confirmed old versions move to the history area.
 
@@ -146,9 +150,9 @@ The self-test uses temporary synthetic files and covers known regressions. Real 
 - `evals/`: evaluation prompts
 - `prompts/`: product-neutral installation and usage guidance
 
-### Version 1.4.0
+### Version 1.5.0
 
-Version `1.4.0` adds multi-dimensional classification and counter-evidence checks, so the Agent does not classify a file from one repeated keyword or from the absence of a role-specific term. See [CHANGELOG.md](CHANGELOG.md).
+Version `1.5.0` adds safe archive-package handling, text-image orientation correction, schema 3 media authorization, and a new default inbox while preserving schema 2 compatibility. It retains the multi-dimensional classification and counter-evidence rules from 1.4.0. See [CHANGELOG.md](CHANGELOG.md).
 
 ### Contributing
 
@@ -177,6 +181,8 @@ Issues and pull requests are welcome. Please include a small synthetic example, 
 Agent 先看原有目录和命名习惯，再读文件名、正文和正式元数据。材料中出现单位名称时，还要分清它是作者、发起方、接收方，还是文中提到的业务对象。日期依次取自正文或封面、正式元数据和可靠的原文件名。
 
 还会把来源角色、业务对象、材料体裁、责任流向、关联层级、留存用途、稳定上下文和反证分开判断。同一个关键词重复出现不算多个判断维度；没有出现本岗位专业词，也不能直接把材料归为外部参考。
+
+得到单独的媒体处理授权后，ZIP、TAR、7Z、RAR 会先按安全边界解压，再逐个识别包内主件。业务路线一致时保留原压缩包和相对结构整包归档，路线冲突时整包等待选择。JPEG、PNG、WebP 会比较四个方向的文字识别结果，只有优势明确时纠正方向，并按旋转后的内容重新命名、计算大小和哈希。
 
 内容相同的文件也要查看各自所在的位置。会议包、证据包或报送包里的副本通常承担着结构和留痕作用，整理时会按材料包用途保留。
 
@@ -221,6 +227,8 @@ Agent 先看原有目录和命名习惯，再读文件名、正文和正式元�
 一次执行可能包含读取、改名、移动、写入索引和处理重复文件，所以配置需要同时允许 `read`、`rename`、`move` 和 `deduplicate`。如果只授权其中几项，可以继续预演，也可以让 Agent 绕开一体化脚本，按预览执行已经允许的操作。
 
 遇到用途不明或无法读取的文件，整理器会让它留在原处，并在索引中记下原因。加密、损坏、正在同步、尚未下载到本地以及当前不支持的格式，也按同样方式处理。存在无法读取的文件时，任务会标为未完成。
+
+压缩包会拒绝绝对路径、路径穿越、链接、特殊文件、程序脚本、可执行成员、加密、损坏和固定安全上限。schema 3 新配置默认使用 `00_待归档`，并单独记录解压和文字图片旋转授权；已有 schema 2 配置继续沿用原投放箱并处理普通文件，未补授权前不修改媒体。
 
 内置整理器不会删除独有文件。关系明确并经过确认的旧版本会移入历史区。
 
@@ -277,9 +285,9 @@ python -m json.tool evals/evals.json >/dev/null
 - `evals/`：评测提示
 - `prompts/`：不绑定具体产品的安装与使用说明
 
-### 1.4.0 版本
+### 1.5.0 版本
 
-`1.4.0` 增加多维分类和反证检查，避免凭重复关键词或“没有出现本岗位专业词”直接定类。详见 [CHANGELOG.md](CHANGELOG.md)。
+`1.5.0` 增加安全压缩包、文字图片方向纠正、schema 3 媒体授权和新的默认投放箱，并兼容 schema 2；同时保留 1.4.0 的多维分类和反证检查。详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### 贡献方式
 

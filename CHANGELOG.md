@@ -1,85 +1,144 @@
-# Changelog / 变更记录
+# 变更记录
+
+本文件记录 `organize-files-by-content` 正式源码的版本变化。发布顺序为：
+
+`项目正式源码 → 用户侧安装副本 → 通用 Agent 发布包源目录 → ZIP`
+
+## 1.5.0 - 2026-08-05
+
+### 安全压缩包与图片方向
+
+- 始终识别 ZIP、TAR 系列、7Z、RAR；ZIP/TAR 内置安全解压，7Z/RAR 检测
+  `bsdtar` 或 7-Zip，缺失时明确说明，不误报为普通不支持格式。
+- 固定拒绝越界或绝对路径、链接、特殊文件、程序脚本、可执行成员、加密、损坏和
+  超限包；上限为1000个成员、单文件1GB、总量2GB、嵌套两层。
+- 主件业务路线一致时整包归档，附件随包保存；冲突时整包待选择。归档保留
+  `00_原始压缩包`、`01_解压内容` 和相对结构，原包与每个成员分别登记索引。
+- 哈希、下载序号或占位压缩包名按正文生成材料包名称，原压缩包文件名仍在包内保留。
+- JPEG、PNG、WebP 比较四个方向的 OCR，仅在优势明确时旋转；旋转后重新提取正文、
+  生成名称并重算大小和 SHA-256，正常图、照片和不可解码图片保持不动。
+
+### 投放箱、授权与分类
+
+- 新配置升为 `schema_version: 3`，默认投放箱改为 `00_待归档`，并记录
+  `extract_archive`、`rotate_text_image` 和一次性确认时间。
+- 既有 schema 2 配置继续按原 `待智能整理` 路径处理普通文件；未补授权前不自动
+  解压或修改图片。
+- 普通非压缩文件继续逐个自动处理；Finder 元数据与 Office 锁文件保持原位并排除
+  未解决业务材料统计。
+- 多维分类继续以来源、业务对象、体裁、责任、关联层级、留存用途、包上下文、
+  时间版本和反证综合判断，补充半年工作会、讲话引用、公司战略和外部表达参考回归。
 
 ## 1.4.0 - 2026-08-05
 
-### English
+### 多维分类与反证
 
-Multi-dimensional classification and counter-evidence release.
-
-- Each file is assessed across source role, business object, document type, responsibility flow, relationship level, retention purpose, stable context, time/version, and conflicting evidence.
-- Repeating the same signal in a title and body does not create two semantic dimensions.
-- A missing role-specific keyword does not prove that a file is an external reference, and a reference to a leadership speech does not establish that the document itself is a speech.
-- New evaluation and self-test cases cover these distinctions. GitHub and SkillHub now share version `1.4.0` and the same behavior while keeping channel-specific presentation metadata.
-
-### 中文
-
-多维分类与反证版本。
-
-- 每份材料分别判断来源角色、业务对象、材料体裁、责任流向、关联层级、留存用途、稳定上下文、时间版本和反证冲突。
-- 标题和正文重复同一信号，不算两个语义维度。
-- 缺少本岗位专业词不能证明材料属于外部参考；引用“领导讲话精神”也不能证明材料本身是讲话稿。
-- 增加对应评测与自测；GitHub 和 SkillHub 统一为 `1.4.0`，功能规则一致，渠道展示元数据仍各自保留。
-
-## 1.3.3 - 2026-07-31
-
-### English
-
-Channel-copy alignment. The organizer is unchanged from 1.3.1.
-
-- The Tencent SkillHub listing summary now uses the repository's concise Chinese introduction instead of the longer channel-specific text.
-
-### 中文
-
-渠道文案对齐。整理器本体与 1.3.1 一致。
-
-- 腾讯 SkillHub 的上架简介改用仓库的简明中文介绍，替换此前较长的渠道文案。
-
-## 1.3.2 - 2026-07-31
-
-### English
-
-Distribution-robustness release. The organizer itself is unchanged from 1.3.1.
-
-- The installation prompt no longer requires the `VERSION` file; when it is absent (for example on channels that strip extensionless files), the expected version is taken from the channel package metadata or the listing page.
-- On channels that do not include the `LICENSE` file, the disclaimer links to the LICENSE text in this repository instead of a package-local path.
-- Channel-specific metadata (for example the Tencent SkillHub listing fields) lives only in that channel's package and is not part of this repository.
-
-### 中文
-
-分发健壮性版本。整理器本体与 1.3.1 完全一致。
-
-- 安装提示词不再强依赖 `VERSION` 文件；该文件缺失时（例如不保留无扩展名文件的渠道），以渠道分包元数据或上架页面声明的版本为准。
-- 在不含 `LICENSE` 文件的渠道中，免责声明改为链接本仓库中的 LICENSE 文本，不再指向包内路径。
-- 各渠道专属元数据（例如腾讯 SkillHub 的上架字段）只存在于对应渠道的分发包，不进入本仓库。
+- 每份材料新增“来源角色、业务对象、材料体裁、责任流向、关联层级、留存用途、稳定上下文、时间版本、反证冲突”判定卡。
+- 明确证据来源数量不等于语义维度数量；标题和正文重复同一句话不能冒充多维印证。
+- 关联层级区分直接业务、间接支撑或约束、组织级战略治理和明确外部参考。
+- 禁止从“没有主业关键词”反推出外部参考；组织战略、治理体系、责任矩阵和跨部门机制先按实际层级判断。
+- 禁止凭“领导讲话精神”等引用短语判断讲话体裁；完整讲话需由体裁、讲话人或会议场景相互印证。
+- 增加对应评测场景和自测断言，防止后续退回单关键词分类。
 
 ## 1.3.1 - 2026-07-31
 
-### English
+### 运行时证据与上下文修复
 
-Version 1.3.1 tightens the checks for evidence, protected packages, duplicate files, profile choices, and dates.
+- 自动分类改为按文件名、正文、正式元数据、已确认稳定原路径等实际来源计数；同一词重复写入名称和关键词不再虚增证据，随机邻居不参与自动评分，只有一类实际证据时保持原位待确认。
+- 正式提交包、会议包、报送包、证据包和运行目录按精确路径段或可靠日期后缀在脚本层原位保护并进入主索引；普通类别、否定表达和包含包名的制度研究目录不会被子串误冻结。包标记拒绝正则、通配符、路径分隔符和越级路径；损坏、缺少必需部件或正文 XML 损坏的包内 Office 文件保持原位，但登记失败并阻断完成。
+- 情境副本只接受精确包边界或本人确认的根内相对路径；两个不同嵌套路径用途关系不明时进入待选择，不用“会议、参考”等宽泛子串自动决定。
+- 主索引补齐待人工选择、不支持格式、系统或运行依赖、包内副本、情境副本和读取失败记录；可读取项记录大小与SHA-256，读取失败项明确阻断完成声明；同一路径内容变化或待确认文件改名后，主索引与待确认队列只保留当前实体，问题解决后清除旧待办。
+- 后台监控不再静默跳过隐藏或忽略项，处理失败会提醒并阻止同一未变化文件在当前进程中反复重试；同一主件重复运行不再累积活动索引，原地修改后旧活动哈希会失效，同一路径待确认记录只保留当前内容。
+- 本人否定候选的近似扩展词、`parent`、`people` 和 `organizations` 字段一并拒绝；短英文候选兼顾词边界、缩写标点和正则规则，既拦截 `A.I.`、`A-I` 等等价绕过，也避免 `AI` 误伤 `Paid Media`。
+- Office/PDF正式元数据进入日期和语境判断，包括完整或部分精度的 PDF 标准 `D:` 日期；补充清理带时分秒的 `IMG/聊天图片`、常见截图占位名、方括号下载序号和有内容证据的裸 `MMDD`。
+- 删除表面可配置但运行时不生效的日期、重复与不确定版本字段；mtime 禁用、普通命名审计和正式名称保护作为不可关闭的安全断言，值不符时连预演也拒绝。首次加载改为按画像、配置和自动化阶段读取引用，长引用增加导航。
 
-- Automatic routing now requires evidence from at least two sources among the filename, body, formal metadata, and a confirmed stable parent path.
-- Confirmed boundaries and exact path markers protect formal packages and runtime directories. Their contents stay together and appear in the main index.
-- The main index now records pending and unsupported items, hidden entries, package contents, runtime dependencies, identical files kept in different contexts, and read failures.
-- An exact package boundary or confirmed relative path preserves identical files that serve different purposes. Unclear cases stay in place.
-- Routing fields now catch close variants of choices the user has rejected while respecting short-word boundaries.
-- The organizer reads Office and PDF metadata dates when available. Filename cleanup now also handles screenshots, chat images, download counters, and reliable compact dates.
-- Monitoring now indexes hidden and ignored entries. Repeated runs and in-place changes keep one active record for each current file state.
-- Synthetic tests now cover package protection, independent evidence, index completeness, duplicate-file context, rejected-choice variants, metadata dates, and filename cleanup.
+### 回归验证
 
-I checked this release with the official Skill structure validator, the project self-test, Python syntax compilation, evaluation JSON parsing, and repository whitespace checks.
+- 增加正式包强关键词误抽取、包名子串与无效标记、包内损坏文件、随机邻居误路由、情境副本、主件与待确认重复运行、监控隐藏项、不支持格式、合成读取失败、单一文件名证据、稳定路径加正文、否定候选绕过、截图命名和元数据日期等反例。
+- 项目自测、Python语法编译、`evals.json` 解析、`git diff --check` 和官方 `quick_validate.py` 已通过；三路独立固定哈希审计均确认 P0、P1、P2 为0。
 
-### 中文
+### 下游同步
 
-1.3.1 调整了自动整理的判断条件，涉及证据来源、材料包、重复文件、工作类型选项和日期。
+- 独立审计放行后，才将 `1.3.1` 同步到用户侧安装副本，并重建通用 Agent 桌面文件夹和 ZIP；原 `1.3.0` 安装副本、桌面包和 ZIP 已完整备份。
+- 安装副本11个文件、桌面包15个文件均与正式源逐文件及权限一致；文本 UTF-8、隐藏或垃圾文件、符号链接、ZIP完整性、Python 标准解压中文路径、回解一致性、安装副本自测和官方校验均通过。
+- 首版 ZIP 因中文条目未设置标准 UTF-8（EFS）文件名标志而被交付审计拦截；重建后的 ZIP 所有中文条目均设置该标志。当前 ZIP 为 `88514` 字节，SHA-256 为 `6423fcec612b8b995986d450818819955b24c502961c67e8f0f06ee0c88f714e`。
 
-- 自动分类至少需要文件名、正文、正式元数据和已经确认的稳定父目录中的两类证据。
-- 已经确认的边界和精确路径标记会保护正式材料包与程序运行目录。内部文件继续放在一起，并写入主索引。
-- 主索引现在会记录待确认项、不支持的文件、隐藏项、材料包内容、运行依赖、因用途不同而保留的相同文件，以及读取失败。
-- 精确材料包边界或已经确认的相对路径，可以保留用途不同的相同文件。用途尚未确认时，文件留在原处。
-- 分类字段现在会识别已否定选项的近似写法，也会避免短词被误匹配。
-- 文件能够读取相应元数据时，整理器会提取 Office 和 PDF 中的日期。文件名清理也增加了对截图、聊天图片、下载序号和可靠紧凑日期的处理。
-- 监控会把隐藏项和忽略项写入索引。重复运行或文件原地变化后，每个当前文件状态保留一条活动记录。
-- 合成测试增加了正式材料包保护、独立证据、索引完整性、相同文件的用途判断、已否定选项的变体、元数据日期和文件名清理等场景。
+## 1.3.0 - 2026-07-30
 
-这个版本已经通过官方 Skill 结构校验、项目自测、Python 语法编译、评测 JSON 解析和仓库空白检查。
+### 职业与身份个性化
+
+- 在读取正文前增加职业与身份确认：记录当前职业或岗位、组织或工作场景、多重身份、适用范围和有效时段。
+- 根据本人填写的职业生成少量常见职责或工作类型候选，要求逐项选择“主责、参与、仅参考、不适用”；候选未覆盖时继续提供下一组选项，不要求本人另写职责清单，不把职业刻板印象当作事实。
+- 增加业务对象、典型交付物、主要接收方、工作周期、查找入口和保护边界等高价值选择项；除职业、职位等必要身份信息外均采用选项式确认，只读盘点后再用真实文件证据二次校正身份画像。
+- 明确职业和职责只用于理解语境、发现遗漏和解释候选，不直接生成一级目录，也不能覆盖稳定原路径、正文用途、正式包上下文或本人确认的查找习惯。
+- 支持多重身份、历史岗位、个人材料和共享资料边界；共享目录不得套用当前操作者的职业画像替其他成员作决定。
+- 增加画像适用性选项：个人或纯共享资料可记录 `profile_applies: false` 并跳过无关工作类型候选，范围、权限和预览确认仍保留。
+- 将“暂不确定”拆成两级门槛：明确回复后仅可放行只读盘点，暂缓项解决或排除前不得生成正式路由或实际执行。
+
+### 通用 Agent 适配与验证
+
+- 将发布提示词从单一平台改为通用 Agent 适配：先识别当前 Agent 的真实安装、发现、元数据、调用和 Skills 分类机制，不默认任何具体 Agent。
+- 增加纯通用合成场景，覆盖多重身份、职业候选被否定、历史岗位材料、混乱共享区和身份与正文用途冲突。
+- 为实际执行增加运行时硬门槛：校验 schema、身份确认、授权操作、混合或共享范围、全量预览确认和待选择项；整理脚本、监控和自启动安装共用同一校验。
+- 单根脚本收到根目录外文件时改为明确报错；跨多个电脑位置汇聚到桌面由当前 Agent 按确认预览执行，不再让单根脚本静默漏项。
+- 拒绝 `..`、绝对路径、符号链接及异常索引造成的授权根目录逃逸；范围校验失败时不预先创建投放箱或归档目录。
+- 版本策略在本版只允许移入历史区，配置拼写错误或未授权删除不会进入删除分支；本人否定的候选若被复制进路由，执行校验会拒绝。
+- 将监控启用、真实投递通过、登录自启动确认和既有自启动替换确认分开记录；一次性整理授权不能直接启用后台任务。
+- 预演不再创建整理说明目录或锁文件。
+- 更新个人画像配置示例、界面元数据、维护验收项和发布包说明。
+
+### 发布结果与边界
+
+- 用户侧安装副本已从 `1.1.3` 原位升级到 `1.3.0`，并完成实际发现、主体比对、结构校验和合成自测。
+- 已生成通用 Agent 桌面文件夹和 ZIP；15个文件通过 UTF-8、无垃圾文件、解压完整性、回解比对和 SHA-256 验证。
+- 未读取、整理或测试任何真实业务文件夹；未创建投放箱，未启用监控、自启动或定时任务。
+
+## 1.2.0 - 2026-07-30
+
+### 通用分类决策
+
+- 将责任角色与存放用途分开；主责、牵头、协同、作者或供稿不再直接推出一级项目。
+- 提高独立项目门槛，增加身份、材料链或生命周期、持续查找价值和根目录可扫描性检查。
+- 将原父目录、重复聚类、邻接文件、作者或创建者、发起方、接收方、业务对象、正文引用和实际留存用途提升为核心证据。
+- 修正根目录绝对规则：禁止无证据空泛层，同时允许有证据的稳定类别承载主责工作、项目和子事项包。
+- 增加高度混乱桌面或其他位置的低风险兜底流程，不再强套项目优先结构。
+- 完善个人电脑去冗余命名、会议或正式包恢复、普通重复与情境副本区分、全局同类纠错审计。
+- 区分自动化的安装、配置、启用和运行验证状态；分类变化后要求重建配置、归档旧路径状态、代表性预演和真实投递验证。
+
+### 实现与验证
+
+- 自动归档配置支持为项目和用途类别保留经证据确认的稳定上层。
+- 情境副本默认识别扩展到正式提交、证据、会议、报送、参考、导出和验收语境。
+- 增加纯通用合成前向测试，覆盖稳定上层、责任与用途、单文件不建项目、情境副本和歧义原地保留。
+- 更新 `agents/openai.yaml`，使默认提示体现用途、上下文、项目门槛和待确认规则。
+
+### 边界
+
+- 未修改用户侧安装副本。
+- 未修改 KIMI 文案、发布包或 ZIP。
+- 未整理或测试任何真实业务文件夹。
+
+## 1.1.3 - 2026-07-29
+
+### 维护基线
+
+- 将已核验的用户侧安装主体原样迁入 `Skills` 项目，建立唯一正式源码位置。
+- 将 KIMI 安装提示词、执行提示词和简介原样迁入 `distribution/kimi/`，避免继续从桌面发布副本维护。
+- 中文显示名称为 `文件｜通用内容智能整理`。
+- 保留项目优先、原目录上下文高权重、逐文件命名审计、正式名称保护、歧义人工选择、可回滚和跨平台规则。
+- 建立维护规格、目录收录和单向发布关系。
+
+### 验证
+
+- 迁入前，用户侧安装主体与桌面发布包主体逐文件一致。
+- 用户侧安装版本与发布包版本均为 `1.1.3`。
+- 既有 ZIP SHA-256 为 `e6f9117eaf8dbae7bb41901084cebdad68cb8cdda24bffa637340c343f541cc9`，压缩完整性检查通过。
+- 安全自测通过。
+
+### 边界
+
+- 本次未修改功能代码。
+- 本次未同步或覆盖用户侧安装副本。
+- 本次未修改、覆盖或重新生成桌面发布包和 ZIP。
+- 本次未读取、整理或测试任何真实业务文件夹。

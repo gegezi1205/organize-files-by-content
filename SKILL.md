@@ -1,6 +1,6 @@
 ---
 name: organize-files-by-content
-description: Confirm a person's occupation, role contexts, common work types, and retrieval preferences, then learn existing folder habits and inspect every in-scope file and its context to distinguish responsibility from storage purpose, preserve coherent packages, and propose evidence-based routing and naming. Use for organizing messy or established Desktops, Downloads, work folders, shared folders, other scoped computer locations, or a dedicated inbox on Windows, macOS, or Linux; also use for multi-role or historical-work separation, project and recurring-work boundaries, reports and meeting materials, reference and personal materials, content-aware naming, formal-package protection, contextual deduplication, searchable indexing, human choice for ambiguity, and verified automation of newly dropped files.
+description: Confirm a person's occupation, role contexts, common work types, and retrieval preferences, then learn existing folder habits and inspect every in-scope file and its context to distinguish responsibility from storage purpose, preserve coherent packages, and propose evidence-based routing and naming. Use for organizing messy or established Desktops, Downloads, work folders, shared folders, other scoped computer locations, or a dedicated inbox on Windows, macOS, or Linux; also use for multi-role or historical-work separation, safe archive extraction, text-image orientation correction, content-aware naming, formal-package protection, contextual deduplication, searchable indexing, human choice for ambiguity, and verified automation of newly dropped files.
 ---
 
 # 通用文件智能整理
@@ -120,6 +120,7 @@ description: Confirm a person's occupation, role contexts, common work types, an
 - 不得为了证明执行过而把一个已经准确合规的名称机械改成同义词；也不得因为文件已在正确目录就跳过命名审计。
 - 中文括号、书名号、引号、标点和引号内的固定短语属于名称语义的一部分。除跨平台非法字符外，不得仅为格式统一而改成另一套标点或把固定短语中的空格机械替换为下划线。
 - `2024-2025`、`2026上半年`、`2026Q2` 等时间跨度或周期必须作为一个整体保留，不能截成单一年份。日期精度压缩到月份后若多份不同内容会重名，优先使用正文已有的期次或版本区分；没有可靠期次或版本时转为待人工选择，不得覆盖或自动追加无含义序号。
+- JPEG、PNG、WebP 文字图片先比较 0°、90°、180°、270° 的 OCR 结果。只有文字量和识别质量具有明确优势时才纠正方向；正常图片、照片和低文字图片保持不动。发生旋转后必须重新提取正文、重建内容名称，并按新文件重新计算大小和 SHA-256；解码、OCR 或安全写回不可用时保留原图并明确记录。
 
 ### 不改名边界
 
@@ -137,7 +138,10 @@ description: Confirm a person's occupation, role contexts, common work types, an
 
 配置确认并通过预演后，只有使用者另行选择启用监控，才在根目录创建：
 
-`待智能整理`
+`00_待归档`
+
+`schema_version: 3` 的新配置默认使用该名称。已有 `schema_version: 2` 配置继续沿用
+原来的 `待智能整理`，不得为了升级强制移动既有投放箱。
 
 使用者只需把新文件放入该文件夹。跨平台监控程序调用：
 
@@ -151,6 +155,25 @@ python scripts/organizer.py \
 高置信度文件只有在本次文件实际命中至少两类相互独立证据时才自动改名归档；配置里声明“至少两类”不能代替正文、正式元数据、已确认稳定原路径或文件名等真实命中。随机父目录和随机邻居可供 Agent 在预览中提出候选，但不能直接充当自动路由证据。无法可靠读取或判断的文件保持在投放箱，并在 `00_整理说明/99_待人工选择.csv` 中列明 2—3 个候选分类、判断依据和原路径。交互运行时必须弹出选择，选择完成后才归档。使用 [watch_inbox.py](scripts/watch_inbox.py) 监控投放箱，并按 [platform-automation.md](references/platform-automation.md) 设置登录后自动运行。
 
 一次性整理确认不能替代监控授权。前台监控须单独记录启用确认；至少一次真实投递完成接收、执行、落位和索引登记后，再由使用者单独确认登录自启动。脚本会拒绝未确认画像、只读或混合权限、未确认全量预览、待选择项未清空、根目录外路径、未单独授权监控或未通过真实投递测试的配置。
+
+### 压缩包与媒体授权
+
+- 始终识别 ZIP、TAR/TGZ/TBZ/TXZ、7Z 和 RAR。ZIP/TAR 使用内置安全解析；7Z/RAR
+  使用系统中实际检测到的 `bsdtar` 或 7-Zip。缺少安全解压器时明确说明，不把压缩包
+  误报为普通不支持文件。
+- 拒绝绝对路径、`..` 越界、软硬链接、特殊文件、程序脚本、可执行成员、加密包、
+  损坏包和超限包。固定上限为 1000 个成员、单文件 1GB、解压总量 2GB、嵌套两层。
+- 逐个读取包内主件。真实业务路线一致时整包自动归档，附件随包保留；存在相互冲突
+  的业务路线时整包保持完整并待选择，不拆散。
+- 归档结构固定为 `材料包/00_原始压缩包` 与 `材料包/01_解压内容`，保留内部相对
+  结构。原包、包内主件和附件分别进入索引。原包名称有意义时保留；哈希、下载序号
+  或占位名按正文生成可识别的材料包名称，但原压缩包文件名在包内不变。
+- 新配置必须使用 `schema_version: 3`，并在 `media_processing.authorized_actions`
+  同时记录 `extract_archive`、`rotate_text_image` 及一次性 `confirmed_at`。旧版
+  schema 2 仍处理普通文件；补充授权前不自动解压压缩包，也不修改图片。
+- 普通 DOCX、PDF、PPTX、图片和文本继续逐个自动处理，不因“不是 ZIP”进入待确认。
+  Finder 元数据、Office 锁文件和下载中临时项保持原位，登记为运行依赖，不计入未解决
+  业务材料。只消除可由完整正文和上下文解决的待确认，不降低真实语义冲突门槛。
 
 ## 重复与版本
 

@@ -100,7 +100,7 @@ def linux_plan(config_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="安装待智能整理投放箱的登录自启动")
+    parser = argparse.ArgumentParser(description="安装已配置投放箱的登录自启动")
     parser.add_argument("--config", required=True, help="整理配置JSON完整路径")
     parser.add_argument("--apply", action="store_true", help="实际安装；默认只预览")
     args = parser.parse_args()

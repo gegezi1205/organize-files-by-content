@@ -2,11 +2,14 @@
 import csv
 import importlib.util
 import json
+import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -17,6 +20,9 @@ CLASSIFICATION_REFERENCE = (
     SCRIPT_DIR.parent / "references" / "personal-classification-model.md"
 )
 SKILL_REFERENCE = SCRIPT_DIR.parent / "SKILL.md"
+VERSION_FILE = SCRIPT_DIR.parent / "VERSION"
+OPENAI_METADATA = SCRIPT_DIR.parent / "agents" / "openai.yaml"
+EVALS_FILE = SCRIPT_DIR.parent / "evals" / "evals.json"
 
 
 def run_result(config_path, source, apply=True):
@@ -48,9 +54,14 @@ def run(config_path, source):
 
 
 def main():
+    assert VERSION_FILE.read_text(encoding="utf-8").strip() == "1.5.0"
     configuration_reference = CONFIGURATION_REFERENCE.read_text(
         encoding="utf-8"
     )
+    assert '"schema_version": 3' in configuration_reference
+    assert '"inbox_name": "00_待归档"' in configuration_reference
+    assert '"extract_archive"' in configuration_reference
+    assert '"rotate_text_image"' in configuration_reference
     assert '"context_copy_folders"' not in configuration_reference
     assert '"confirmed_context_paths"' in configuration_reference
     assert '"protected_package_markers": ["正式提交包"' in configuration_reference
@@ -78,6 +89,12 @@ def main():
         assert required_text in classification_reference
     assert "证据来源数量和语义维度数量是两件事" in skill_reference
     assert "不是外部参考证据" in skill_reference
+    assert "ZIP、TAR/TGZ/TBZ/TXZ、7Z 和 RAR" in skill_reference
+    assert "JPEG、PNG、WebP" in skill_reference
+    metadata = OPENAI_METADATA.read_text(encoding="utf-8")
+    assert "压缩包" in metadata and "图片" in metadata
+    evals = json.loads(EVALS_FILE.read_text(encoding="utf-8"))
+    assert any(item.get("id") == 15 for item in evals["evals"])
 
     with tempfile.TemporaryDirectory(prefix="organize-files-self-test-") as temporary:
         root = Path(temporary)
@@ -1454,6 +1471,303 @@ def main():
         assert "archive_name" in escaped_result.stdout
         assert escaped_source.is_file()
         assert not escaped_path.exists()
+
+        assert module.archive_suffix(Path("资料.ZIP")) == ".zip"
+        assert module.archive_suffix(Path("资料.7z")) == ".7z"
+        assert module.archive_suffix(Path("资料.rar")) == ".rar"
+        assert module.archive_suffix(Path("普通文件.docx")) == ""
+        assert module.choose_image_rotation(
+            {0: "", 90: "测试文字" * 80, 180: "", 270: ""}
+        ) == 90
+        assert module.choose_image_rotation(
+            {0: "测试文字" * 80, 90: "测试文字" * 81, 180: "", 270: ""}
+        ) == 0
+        assert "运行元数据" in module.ignored_reason(
+            Path("Icon\r_2"),
+            config,
+        )
+        assert "临时锁定" in module.ignored_reason(
+            Path("~$正在编辑.docx"),
+            config,
+        )
+
+        media_root = root / "媒体处理测试"
+        media_root.mkdir()
+        media_inbox = media_root / "00_待归档"
+        media_inbox.mkdir()
+        media_config = json.loads(json.dumps(config, ensure_ascii=False))
+        media_config["schema_version"] = 3
+        media_config["root_folder"] = str(media_root)
+        media_config.pop("inbox_name", None)
+        media_config["identity_context"]["roles"][0]["applies_to_roots"] = [
+            str(media_root)
+        ]
+        media_config["media_processing"] = {
+            "authorized_actions": [
+                "extract_archive",
+                "rotate_text_image",
+            ],
+            "confirmed_at": "2026-08-05 12:00",
+        }
+        media_config_path = media_root / "整理配置.json"
+        media_config_path.write_text(
+            json.dumps(media_config, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        loaded_media_config = module.load_config(media_config_path)
+        assert loaded_media_config["inbox_name"] == "00_待归档"
+        module.validate_apply_authorization(
+            loaded_media_config,
+            media_root,
+        )
+
+        archive_path = media_inbox / (
+            "0123456789abcdef0123456789abcdef.zip"
+        )
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            archive.writestr(
+                "某项目月报_2026年7月.txt",
+                "某项目月报\n2026年7月\n月报用途",
+            )
+            archive.writestr(
+                "某项目月报附件_2026年7月.txt",
+                "某项目月报\n2026年7月\n月报附件",
+            )
+        archive_output = run(media_config_path, archive_path)
+        assert "压缩包归档" in archive_output
+        assert not archive_path.exists()
+        original_archives = list(
+            media_root.rglob(
+                "00_原始压缩包/"
+                "0123456789abcdef0123456789abcdef.zip"
+            )
+        )
+        assert len(original_archives) == 1
+        package_root = original_archives[0].parents[1]
+        assert package_root.name != archive_path.stem
+        assert len(list((package_root / "01_解压内容").rglob("*.txt"))) == 2
+        with (media_root / "00_整理说明" / "文件索引.csv").open(
+            encoding="utf-8-sig",
+            newline="",
+        ) as stream:
+            archive_rows = list(csv.DictReader(stream))
+        assert {row["状态"] for row in archive_rows} == {
+            "原始压缩包",
+            "压缩包内主件",
+        }
+        for row in archive_rows:
+            target = media_root / row["新路径"]
+            assert target.is_file()
+            assert module.sha256(target) == row["SHA-256"]
+
+        tar_source_directory = media_root / "tar源"
+        tar_source_directory.mkdir()
+        for number in (1, 2):
+            (tar_source_directory / f"某项目月报_{number}_2026年8月.txt").write_text(
+                f"某项目月报\n2026年8月\n第{number}份月报",
+                encoding="utf-8",
+            )
+        tar_path = media_inbox / "某项目月报材料包.tar"
+        with tarfile.open(tar_path, "w") as archive:
+            for member in sorted(tar_source_directory.iterdir()):
+                archive.add(member, arcname=member.name)
+        tar_output = run(media_config_path, tar_path)
+        assert "压缩包归档" in tar_output
+        assert not tar_path.exists()
+
+        mixed_path = media_inbox / "路线冲突.zip"
+        with zipfile.ZipFile(mixed_path, "w") as archive:
+            archive.writestr(
+                "某项目月报_2026年8月.txt",
+                "某项目月报\n2026年8月\n月报用途",
+            )
+            archive.writestr(
+                "项目乙唯一识别词进展_2026年8月.txt",
+                "项目乙唯一识别词进展\n2026年8月\n进展用途",
+            )
+        mixed_output = run(media_config_path, mixed_path)
+        assert "待人工选择" in mixed_output
+        assert "路线不一致" in mixed_output
+        assert mixed_path.is_file()
+
+        unsafe_path = media_inbox / "不安全路径.zip"
+        with zipfile.ZipFile(unsafe_path, "w") as archive:
+            archive.writestr("../越界.txt", "某项目月报")
+        unsafe_output = run(media_config_path, unsafe_path)
+        assert "待人工选择" in unsafe_output
+        assert "不安全路径" in unsafe_output
+        assert unsafe_path.is_file()
+        assert not (media_root.parent / "越界.txt").exists()
+
+        executable_path = media_inbox / "可执行成员.zip"
+        executable_member = zipfile.ZipInfo("run.sh")
+        executable_member.external_attr = (
+            stat.S_IFREG | 0o755
+        ) << 16
+        with zipfile.ZipFile(executable_path, "w") as archive:
+            archive.writestr(executable_member, "#!/bin/sh\n")
+        executable_output = run(media_config_path, executable_path)
+        assert "待人工选择" in executable_output
+        assert "可执行成员" in executable_output
+        assert executable_path.is_file()
+
+        damaged_archive = media_inbox / "损坏压缩包.zip"
+        damaged_archive.write_bytes(b"not a zip archive")
+        damaged_output = run(media_config_path, damaged_archive)
+        assert "待人工选择" in damaged_output
+        assert "压缩包识别失败" in damaged_output
+        assert damaged_archive.is_file()
+
+        linked_tar = media_inbox / "链接成员.tar"
+        with tarfile.open(linked_tar, "w") as archive:
+            linked_member = tarfile.TarInfo("链接.txt")
+            linked_member.type = tarfile.SYMTYPE
+            linked_member.linkname = "../目标.txt"
+            archive.addfile(linked_member)
+        linked_output = run(media_config_path, linked_tar)
+        assert "待人工选择" in linked_output
+        assert "链接" in linked_output
+        assert linked_tar.is_file()
+
+        nested_buffer = tempfile.SpooledTemporaryFile()
+        with zipfile.ZipFile(nested_buffer, "w") as nested:
+            nested.writestr(
+                "深层/某项目月报_2026年8月.txt",
+                "某项目月报\n2026年8月\n深层月报",
+            )
+        nested_buffer.seek(0)
+        nested_archive = media_inbox / "嵌套材料包.zip"
+        with zipfile.ZipFile(nested_archive, "w") as archive:
+            archive.writestr(
+                "正文/某项目月报_2026年8月.txt",
+                "某项目月报\n2026年8月\n月报用途",
+            )
+            archive.writestr("附件/内层.zip", nested_buffer.read())
+        nested_output = run(media_config_path, nested_archive)
+        assert "压缩包归档" in nested_output
+        assert list(media_root.rglob("内层_解压内容/深层/*.txt"))
+
+        for args, expected in (
+            ((1001, 0), "文件数"),
+            ((1, module.MAX_ARCHIVE_TOTAL_SIZE + 1), "总大小"),
+            ((1, 0, module.MAX_ARCHIVE_FILE_SIZE + 1), "单个文件"),
+        ):
+            try:
+                module.validate_archive_totals(*args)
+            except ValueError as exc:
+                assert expected in str(exc)
+            else:
+                raise AssertionError("压缩包超限时不应通过")
+
+        for suffix in (".7z", ".rar"):
+            external_archive = media_inbox / f"缺少解压器{suffix}"
+            external_archive.write_bytes(b"placeholder")
+            with tempfile.TemporaryDirectory(
+                prefix="organize-files-extractor-test-"
+            ) as extraction_directory:
+                with mock.patch.object(
+                    module,
+                    "external_archive_tool",
+                    return_value=("", ""),
+                ):
+                    try:
+                        module.extract_archive_safely(
+                            external_archive,
+                            Path(extraction_directory) / "extracted",
+                        )
+                    except ValueError as exc:
+                        assert "已识别为" in str(exc)
+                        assert "安全的bsdtar或7-Zip" in str(exc)
+                    else:
+                        raise AssertionError("缺少解压器时不应处理7Z/RAR")
+            external_archive.unlink()
+
+        rollback_archive = media_inbox / "索引回滚测试.zip"
+        with zipfile.ZipFile(rollback_archive, "w") as archive:
+            archive.writestr(
+                "某项目月报_索引回滚_2026年8月.txt",
+                "某项目月报\n2026年8月\n索引回滚测试",
+            )
+        package_directories_before = {
+            path
+            for path in media_root.rglob("*")
+            if path.is_dir() and (path / "00_原始压缩包").is_dir()
+        }
+        with mock.patch.object(
+            module,
+            "append_index_rows_atomic",
+            side_effect=RuntimeError("模拟索引失败"),
+        ):
+            rollback_status, rollback_target, rollback_reason = (
+                module.archive_package(
+                    media_root,
+                    loaded_media_config,
+                    rollback_archive,
+                    True,
+                )
+            )
+        assert rollback_status == "待人工选择"
+        assert rollback_target == rollback_archive
+        assert rollback_archive.is_file()
+        assert "模拟索引失败" in rollback_reason
+        package_directories_after = {
+            path
+            for path in media_root.rglob("*")
+            if path.is_dir() and (path / "00_原始压缩包").is_dir()
+        }
+        assert package_directories_after == package_directories_before
+
+        schema2_archive = inbox / "schema2仍需授权.zip"
+        with zipfile.ZipFile(schema2_archive, "w") as archive:
+            archive.writestr(
+                "某项目月报_2026年8月.txt",
+                "某项目月报\n2026年8月\n月报用途",
+            )
+        schema2_output = run(config_path, schema2_archive)
+        assert "待人工选择" in schema2_output
+        assert "旧版schema 2未授权自动解压" in schema2_output
+        assert schema2_archive.is_file()
+
+        unauthorized_root = root / "媒体未授权"
+        unauthorized_root.mkdir()
+        unauthorized_config = json.loads(
+            json.dumps(media_config, ensure_ascii=False)
+        )
+        unauthorized_config["root_folder"] = str(unauthorized_root)
+        unauthorized_config["identity_context"]["roles"][0][
+            "applies_to_roots"
+        ] = [str(unauthorized_root)]
+        unauthorized_config.pop("media_processing")
+        unauthorized_config_path = unauthorized_root / "整理配置.json"
+        unauthorized_config_path.write_text(
+            json.dumps(unauthorized_config, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        unauthorized_source = unauthorized_root / "某项目月报.txt"
+        unauthorized_source.write_text(
+            "某项目月报\n2026年8月\n",
+            encoding="utf-8",
+        )
+        unauthorized_result = run_result(
+            unauthorized_config_path,
+            unauthorized_source,
+        )
+        assert unauthorized_result.returncode == 2
+        assert "media_processing授权" in unauthorized_result.stdout
+        assert unauthorized_source.is_file()
+
+        try:
+            from PIL import Image
+        except Exception:
+            Image = None
+        if Image is not None:
+            image_path = media_root / "方向测试.png"
+            Image.new("RGB", (120, 60), "white").save(image_path)
+            before_digest = module.sha256(image_path)
+            module.rotate_image_in_place(image_path, 90)
+            with Image.open(image_path) as rotated:
+                assert rotated.size == (60, 120)
+            assert module.sha256(image_path) != before_digest
 
         existing_rows = module.read_index(root / "00_整理说明" / "文件索引.csv")
         malicious_rows = existing_rows + [{
