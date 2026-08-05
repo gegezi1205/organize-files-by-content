@@ -13,6 +13,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 ORGANIZER = SCRIPT_DIR / "organizer.py"
 WATCHER = SCRIPT_DIR / "watch_inbox.py"
 CONFIGURATION_REFERENCE = SCRIPT_DIR.parent / "references" / "configuration.md"
+CLASSIFICATION_REFERENCE = (
+    SCRIPT_DIR.parent / "references" / "personal-classification-model.md"
+)
+SKILL_REFERENCE = SCRIPT_DIR.parent / "SKILL.md"
 
 
 def run_result(config_path, source, apply=True):
@@ -58,6 +62,22 @@ def main():
         '"uncertain"',
     ):
         assert obsolete_field not in configuration_reference
+    classification_reference = CLASSIFICATION_REFERENCE.read_text(
+        encoding="utf-8"
+    )
+    skill_reference = SKILL_REFERENCE.read_text(encoding="utf-8")
+    for required_text in (
+        "单文件多维判定卡",
+        "来源与角色",
+        "关联层级",
+        "留存用途",
+        "反证与冲突",
+        "领导讲话精神",
+        "没有出现主业关键词",
+    ):
+        assert required_text in classification_reference
+    assert "证据来源数量和语义维度数量是两件事" in skill_reference
+    assert "不是外部参考证据" in skill_reference
 
     with tempfile.TemporaryDirectory(prefix="organize-files-self-test-") as temporary:
         root = Path(temporary)

@@ -4,7 +4,7 @@
 
 An Agent Skill that organizes files around their purpose, existing structure, and the way you look for them. It shows every proposed change before it touches a file.
 
-Current version: `1.3.1`
+Current version: `1.4.0`
 
 ```bash
 npx skills add gegezi1205/organize-files-by-content
@@ -44,6 +44,8 @@ The Agent checks:
 - the file's purpose and the people or organizations named in it;
 - dates found in the document, formal metadata, or a reliable filename;
 - the role of identical files inside packages, evidence sets, and other established folders.
+
+It also separates who produced the file, what it is about, what kind of document it is, how it relates to your work, why you keep it, and any evidence that conflicts. A repeated keyword is not treated as several independent clues, and a missing role-specific term does not by itself make a file an external reference.
 
 The first questions take your job into account. The folder plan comes from the files, existing structure, and your answers.
 
@@ -144,9 +146,9 @@ The self-test uses temporary synthetic files and covers known regressions. Real 
 - `evals/`: evaluation prompts
 - `prompts/`: product-neutral installation and usage guidance
 
-### Version 1.3.1
+### Version 1.4.0
 
-Version `1.3.1` tightens evidence checks, package protection, index records, date handling, filename cleanup, and duplicate decisions. See [CHANGELOG.md](CHANGELOG.md).
+Version `1.4.0` adds multi-dimensional classification and counter-evidence checks, so the Agent does not classify a file from one repeated keyword or from the absence of a role-specific term. See [CHANGELOG.md](CHANGELOG.md).
 
 ### Contributing
 
@@ -173,6 +175,8 @@ Issues and pull requests are welcome. Please include a small synthetic example, 
 桌面、下载目录、长期使用的工作资料、个人参考资料和权限明确的共享文件夹都可以纳入整理。多个位置需要分别确认范围和权限。
 
 Agent 先看原有目录和命名习惯，再读文件名、正文和正式元数据。材料中出现单位名称时，还要分清它是作者、发起方、接收方，还是文中提到的业务对象。日期依次取自正文或封面、正式元数据和可靠的原文件名。
+
+还会把来源角色、业务对象、材料体裁、责任流向、关联层级、留存用途、稳定上下文和反证分开判断。同一个关键词重复出现不算多个判断维度；没有出现本岗位专业词，也不能直接把材料归为外部参考。
 
 内容相同的文件也要查看各自所在的位置。会议包、证据包或报送包里的副本通常承担着结构和留痕作用，整理时会按材料包用途保留。
 
@@ -273,9 +277,9 @@ python -m json.tool evals/evals.json >/dev/null
 - `evals/`：评测提示
 - `prompts/`：不绑定具体产品的安装与使用说明
 
-### 1.3.1 版本
+### 1.4.0 版本
 
-`1.3.1` 调整了证据校验、材料包保护、主索引记录、日期读取、文件名清理和重复文件判断。详见 [CHANGELOG.md](CHANGELOG.md)。
+`1.4.0` 增加多维分类和反证检查，避免凭重复关键词或“没有出现本岗位专业词”直接定类。详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### 贡献方式
 
