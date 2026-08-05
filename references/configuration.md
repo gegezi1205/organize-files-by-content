@@ -15,7 +15,7 @@
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "root_folder": "<用户确认的完整路径>",
   "scope_context": {
     "ownership": "personal_work | personal_private | team_shared | mixed",
@@ -64,7 +64,11 @@
     "autostart_confirmed_at": "",
     "replace_existing_confirmed_at": ""
   },
-  "inbox_name": "待智能整理",
+  "media_processing": {
+    "authorized_actions": ["extract_archive", "rotate_text_image"],
+    "confirmed_at": "本人一次性确认压缩包解压和文字图片方向纠正的时间"
+  },
+  "inbox_name": "00_待归档",
   "archive_name": ".",
   "naming": {
     "template": "{project_part}{subject}_{type}{version_part}{date_part}",
@@ -157,7 +161,11 @@
 ## 配置要求
 
 - 每份配置只对应一个明确授权的 `root_folder`。多个桌面或电脑内位置分别生成配置和索引，并记录共同的分类画像；不得借多位置任务扫描未授权目录。内置 `organizer.py` 只处理该根目录内的文件，收到根目录外的 `--file` 必须报错，不能静默跳过。多个来源统一迁移到桌面时，由当前 Agent 按已确认的全量预览直接执行；不得把单根脚本说成已完成跨根迁移。
-- 新生成的配置使用 `schema_version: 2`，并保存 `scope_context` 和 `identity_context`。旧配置可以继续读取，但在重建分类、启用自动化或改变路径前必须补做身份、范围和权限确认。
+- 新生成的配置使用 `schema_version: 3`，并保存 `scope_context`、`identity_context`
+  和 `media_processing`。新投放箱默认名为 `00_待归档`。已有 schema 2 配置继续使用
+  自己记录的 `待智能整理` 或其他原路径，不强制迁移；普通文件仍可处理，但在补充
+  `extract_archive`、`rotate_text_image` 和一次性确认时间之前，不自动解压压缩包、
+  不修改图片方向。schema 1 继续只允许预演。
 - 职业、岗位、职责、业务对象、成果、接收方、周期和查找偏好都是判断元素，不是目录模板。`identity_context` 用于解释语境、发现遗漏和形成候选，不直接生成 `projects`、`workstreams` 或 `non_project_categories`。本人选择本次范围与职业无关时记录 `profile_applies: false`，可跳过工作类型候选，但不能跳过范围、权限和预览确认。
 - 除职业、职位、行业或工作场景及必要的多重身份外，其他画像元素由 Agent 提供编号或界面选项。第一轮提出合计5—8项常见工作类型候选并停止；本人用主责、参与、仅参考或不适用选择。若选择“还有遗漏”，再给3—5项新候选；不要求本人自行命名。`not_applicable` 和未确认项不得形成关键词、规则或隐性权重，也不得进入强关键词。
 - 每个身份记录当前、历史、兼职、临时或非职业长期角色及适用根目录。不得用当前职业覆盖历史文件，不得用 mtime 推断身份时段。
@@ -166,6 +174,16 @@
 - 日期位置由 `naming.template` 中 `{date_part}` 的位置决定；安全精度固定为最多月份，来源顺序固定为正文或封面、正式元数据、可靠文件名，mtime 永不作为业务日期。`use_mtime_when_no_date`、`audit_every_ordinary_file` 和 `preserve_formal_names` 是不可关闭的安全断言，值不分别为 `false`、`true`、`true` 时连预演也拒绝。普通完全重复的安全策略固定为“仅在用途上下文相同时合并”。旧字段 `date_position`、`date_max_precision`、`date_source_priority`、`ordinary_exact_duplicate` 和 `version_policy.uncertain` 不再接受，以免配置表面变化而运行时不变；实际执行前须重建旧配置。
 - 选择“暂不确定，待盘点后再问”只允许进入只读盘点，并把未决项写入 `identity_context.deferred_items`。生成正式路由、目录方案或实际执行前，暂缓项必须解决或明确排除。实际执行还必须保存本人确认全量处理预览的 `execution_context.preview_confirmed_at`，且 `pending_choices` 为空。
 - 一次性整理确认不等于后台监控授权。只有 `automation_context.enabled` 为 `true` 且记录 `monitor_confirmed_at` 后，`watch_inbox.py` 才可运行；至少一次真实投递完成接收、执行、目标落位和索引登记并写入 `real_delivery_test_passed_at`，再单独记录 `autostart_confirmed_at` 后，才可安装登录自启动。覆盖不同的既有自启动配置还须记录 `replace_existing_confirmed_at`。
+- `media_processing` 是对会生成新内容或修改文件字节的动作单独授权，不替代范围、
+  预览和监控授权。schema 3 实际执行必须同时包含 `extract_archive` 和
+  `rotate_text_image`，并保存非空 `confirmed_at`；缺少任一项时拒绝实际执行。
+- 安全压缩包上限固定为 1000 个成员、单文件 1GB、总量 2GB、嵌套两层；不得通过
+  配置放宽。ZIP/TAR 使用内置安全解析，7Z/RAR 只有检测到安全解压器时才处理。
+  越界路径、绝对路径、链接、特殊文件、程序脚本、可执行成员、加密、损坏和超限均
+  整包保持并进入待选择。业务主件路线一致才整包落位，路线冲突时不得拆包硬分。
+- JPEG、PNG、WebP 仅在四向 OCR 比较出现明确优势时纠正方向；正常图、照片、低文字
+  图以及无法安全解码或 OCR 的图片保持原样。旋转后重新提取正文、重建名称并重算大小
+  与 SHA-256。
 - 稳定规则至少由两类相互独立的证据印证。`routing.minimum_independent_evidence_types` 必须不低于2，且自动执行要按每个文件实际命中的正文、正式元数据、已确认稳定原路径、文件名等来源计数；不能把同一关键词同时写入名称和强关键词后重复计分，也不能只校验配置里的数字。原父目录与邻接材料可由 Agent 在只读盘点中用于恢复习惯，但只有路径段精确命中已确认项目、事项、稳定类别或用途名时，内置脚本才把它计为自动路由证据；随机嵌套目录和随机邻居不得计入。未确认职业候选只用于提问；正文用途、稳定原路径、本人查找习惯或共享规则出现反证时，进入待确认。
 - 证据来源门槛之外，每条规则还必须在画像和预演中写明它依赖的语义维度及反证：
   来源角色、业务对象、材料体裁、责任流向、关联层级、留存用途、稳定上下文和时间版本。
