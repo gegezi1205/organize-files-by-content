@@ -9,13 +9,16 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import tarfile
+import tempfile
 import time
 import unicodedata
 import zipfile
 from html.parser import HTMLParser
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from xml.etree import ElementTree as ET
 
 
@@ -23,6 +26,20 @@ SUPPORTED = {
     ".doc", ".docx", ".pdf", ".pptx", ".xlsx", ".txt", ".md", ".csv",
     ".json", ".html", ".htm", ".jpg", ".jpeg", ".png", ".webp",
 }
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+ARCHIVE_SUFFIXES = (
+    ".tar.bz2", ".tar.gz", ".tar.xz", ".tbz2", ".tgz", ".txz",
+    ".zip", ".tar", ".7z", ".rar",
+)
+MAX_ARCHIVE_MEMBERS = 1000
+MAX_ARCHIVE_FILE_SIZE = 1024 * 1024 * 1024
+MAX_ARCHIVE_TOTAL_SIZE = 2 * 1024 * 1024 * 1024
+MAX_NESTED_ARCHIVE_DEPTH = 2
+UNSAFE_PACKAGE_SUFFIXES = {
+    ".app", ".command", ".dmg", ".dll", ".dylib", ".exe", ".jar",
+    ".js", ".pkg", ".py", ".sh",
+}
+MEDIA_ACTIONS = {"extract_archive", "rotate_text_image"}
 INDEX_FIELDS = [
     "序号", "处理时间", "状态", "命名决定", "轨道", "项目", "稳定工作域",
     "具体事项", "非项目内容类别", "材料性质", "内容摘要", "分类依据",
@@ -49,6 +66,7 @@ WRITE_ACTIONS = {"read", "rename", "move", "deduplicate"}
 OWNERSHIP_VALUES = {"personal_work", "personal_private", "team_shared", "mixed"}
 ACTIVE_INVENTORY_STATUSES = {
     "主件", "包内副本", "情境副本", "运行依赖", "历史版本",
+    "原始压缩包", "压缩包内主件", "压缩包内附件",
 }
 RELATIONSHIP_VALUES = {
     "primary", "participate", "reference_only", "not_applicable",
@@ -106,6 +124,265 @@ def sha256(path):
 
 def natural_key(value):
     return [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", value)]
+
+
+def archive_suffix(path):
+    name = path.name.lower()
+    return next((suffix for suffix in ARCHIVE_SUFFIXES if name.endswith(suffix)), "")
+
+
+def archive_stem(path):
+    suffix = archive_suffix(path)
+    return path.name[:-len(suffix)] if suffix else path.stem
+
+
+def archive_member_parts(name):
+    normalized = (name or "").replace("\\", "/")
+    if "\x00" in normalized:
+        raise ValueError("压缩包成员名称包含空字符")
+    member = PurePosixPath(normalized)
+    parts = tuple(part for part in member.parts if part not in {"", "."})
+    if member.is_absolute() or not parts or any(part == ".." for part in parts):
+        raise ValueError(f"压缩包包含不安全路径：{name}")
+    return parts
+
+
+def archive_junk(parts):
+    return (
+        "__MACOSX" in parts
+        or parts[-1] == ".DS_Store"
+        or parts[-1].startswith("._")
+    )
+
+
+def checked_archive_destination(directory, name):
+    parts = archive_member_parts(name)
+    target = directory.joinpath(*parts)
+    resolved = target.resolve()
+    root = directory.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise ValueError(f"压缩包成员越出解压目录：{name}")
+    return target, parts
+
+
+def validate_archive_totals(count, total_size, member_size=0):
+    if count > MAX_ARCHIVE_MEMBERS:
+        raise ValueError(f"压缩包文件数超过安全上限：{MAX_ARCHIVE_MEMBERS}")
+    if member_size > MAX_ARCHIVE_FILE_SIZE:
+        raise ValueError("压缩包内单个文件超过1GB安全上限")
+    if total_size > MAX_ARCHIVE_TOTAL_SIZE:
+        raise ValueError("压缩包解压后总大小超过2GB安全上限")
+
+
+def decoded_zip_member_name(member):
+    name = member.filename
+    if member.flag_bits & 0x800:
+        return unicodedata.normalize("NFC", name)
+    try:
+        raw = name.encode("cp437")
+    except UnicodeEncodeError:
+        return unicodedata.normalize("NFC", name)
+    original_has_cjk = bool(re.search(r"[\u3400-\u9fff]", name))
+    for encoding in ("utf-8", "gb18030"):
+        try:
+            candidate = raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        if bool(re.search(r"[\u3400-\u9fff]", candidate)) and not original_has_cjk:
+            return unicodedata.normalize("NFC", candidate)
+    return unicodedata.normalize("NFC", name)
+
+
+def extract_zip_safely(source, destination):
+    count = 0
+    total_size = 0
+    seen_targets = set()
+    with zipfile.ZipFile(source) as archive:
+        for member in archive.infolist():
+            member_name = decoded_zip_member_name(member)
+            target, parts = checked_archive_destination(destination, member_name)
+            if archive_junk(parts):
+                continue
+            relative_target = target.relative_to(destination)
+            if relative_target in seen_targets:
+                raise ValueError(f"压缩包中文件名恢复后发生冲突：{member_name}")
+            seen_targets.add(relative_target)
+            if member.flag_bits & 0x1:
+                raise ValueError("压缩包已加密，无法自动解压识别")
+            mode = member.external_attr >> 16
+            if stat.S_ISLNK(mode):
+                raise ValueError(f"压缩包包含软链接：{member.filename}")
+            if member.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            if mode & 0o111:
+                raise ValueError(f"压缩包包含可执行成员：{member.filename}")
+            count += 1
+            total_size += member.file_size
+            validate_archive_totals(count, total_size, member.file_size)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open(member) as input_stream, target.open("wb") as output_stream:
+                shutil.copyfileobj(input_stream, output_stream)
+
+
+def extract_tar_safely(source, destination):
+    count = 0
+    total_size = 0
+    with tarfile.open(source, mode="r:*") as archive:
+        for member in archive.getmembers():
+            target, parts = checked_archive_destination(destination, member.name)
+            if archive_junk(parts):
+                continue
+            if member.issym() or member.islnk():
+                raise ValueError(f"压缩包包含链接：{member.name}")
+            if member.ischr() or member.isblk() or member.isfifo():
+                raise ValueError(f"压缩包包含特殊设备文件：{member.name}")
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            if not member.isfile():
+                raise ValueError(f"压缩包包含不支持的成员类型：{member.name}")
+            if member.mode & 0o111:
+                raise ValueError(f"压缩包包含可执行成员：{member.name}")
+            count += 1
+            total_size += member.size
+            validate_archive_totals(count, total_size, member.size)
+            input_stream = archive.extractfile(member)
+            if input_stream is None:
+                raise ValueError(f"无法读取压缩包成员：{member.name}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with input_stream, target.open("wb") as output_stream:
+                shutil.copyfileobj(input_stream, output_stream)
+
+
+def external_archive_tool():
+    bsdtar = shutil.which("bsdtar")
+    if bsdtar:
+        return "bsdtar", bsdtar
+    seven_zip = shutil.which("7zz") or shutil.which("7z")
+    if seven_zip:
+        return "7z", seven_zip
+    return "", ""
+
+
+def external_archive_members(kind, executable, source):
+    if kind == "bsdtar":
+        result = subprocess.run(
+            [executable, "-tf", str(source)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=120,
+        )
+        if result.returncode:
+            raise ValueError("压缩包无法读取、格式损坏或已经加密")
+        return result.stdout.decode("utf-8", errors="replace").splitlines()
+    result = subprocess.run(
+        [executable, "l", "-slt", "-ba", str(source)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=120,
+    )
+    if result.returncode:
+        raise ValueError("压缩包无法读取、格式损坏或已经加密")
+    output = result.stdout.decode("utf-8", errors="replace")
+    if re.search(r"^Encrypted = \+$", output, re.M):
+        raise ValueError("压缩包已加密，无法自动解压识别")
+    return [
+        match.group(1).strip()
+        for match in re.finditer(r"^Path = (.+)$", output, re.M)
+        if match.group(1).strip() != str(source)
+    ]
+
+
+def validate_extracted_tree(destination):
+    count = 0
+    total_size = 0
+    root = destination.resolve()
+    for path in destination.rglob("*"):
+        relative = path.relative_to(destination)
+        if archive_junk(relative.parts):
+            continue
+        mode = path.lstat().st_mode
+        if stat.S_ISLNK(mode):
+            raise ValueError(f"压缩包包含链接：{relative}")
+        if path.is_dir():
+            continue
+        if not stat.S_ISREG(mode):
+            raise ValueError(f"压缩包包含特殊文件：{relative}")
+        resolved = path.resolve()
+        if root not in resolved.parents:
+            raise ValueError(f"压缩包成员越出解压目录：{relative}")
+        if mode & 0o111:
+            raise ValueError(f"压缩包包含可执行成员：{relative}")
+        count += 1
+        size = path.stat().st_size
+        total_size += size
+        validate_archive_totals(count, total_size, size)
+
+
+def extract_external_archive_safely(source, destination):
+    kind, executable = external_archive_tool()
+    if not executable:
+        raise ValueError(
+            f"已识别为{archive_suffix(source)}压缩包，"
+            "但当前系统没有安全的bsdtar或7-Zip解压器"
+        )
+    members = external_archive_members(kind, executable, source)
+    for name in members:
+        _, parts = checked_archive_destination(destination, name)
+        if archive_junk(parts):
+            continue
+    validate_archive_totals(len(members), 0)
+    if kind == "bsdtar":
+        command = [
+            executable, "--no-same-owner", "--no-same-permissions",
+            "-xf", str(source), "-C", str(destination),
+        ]
+    else:
+        command = [
+            executable, "x", "-y", f"-o{destination}", "--", str(source),
+        ]
+    result = subprocess.run(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        timeout=300,
+    )
+    if result.returncode:
+        raise ValueError("压缩包自动解压失败、格式损坏或已经加密")
+    validate_extracted_tree(destination)
+
+
+def extract_archive_safely(source, destination):
+    suffix = archive_suffix(source)
+    if not suffix:
+        raise ValueError(f"不支持的压缩格式：{source.suffix}")
+    destination.mkdir(parents=True, exist_ok=False)
+    if suffix == ".zip":
+        extract_zip_safely(source, destination)
+    elif suffix in {
+        ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2",
+        ".tar.xz", ".txz",
+    }:
+        extract_tar_safely(source, destination)
+    else:
+        extract_external_archive_safely(source, destination)
+    validate_extracted_tree(destination)
+
+
+def expand_nested_archives(directory, depth=0):
+    if depth >= MAX_NESTED_ARCHIVE_DEPTH:
+        return
+    nested_archives = [
+        path for path in directory.rglob("*")
+        if path.is_file() and archive_suffix(path)
+    ]
+    for nested in nested_archives:
+        target = nested.parent / f"{archive_stem(nested)}_解压内容"
+        if target.exists():
+            raise ValueError(f"嵌套压缩包解压目录冲突：{target.name}")
+        extract_archive_safely(nested, target)
+        expand_nested_archives(target, depth + 1)
 
 
 def zip_text(path):
@@ -210,13 +487,95 @@ def extract_pdf(path):
     return "", {}
 
 
-def extract_image(path):
+def ocr_image(image):
     try:
         import pytesseract
-        from PIL import Image
-        return pytesseract.image_to_string(Image.open(path), lang="chi_sim+eng")
     except Exception:
         return ""
+    for language in ("chi_sim+eng", "eng"):
+        try:
+            return pytesseract.image_to_string(image, lang=language)
+        except Exception:
+            continue
+    return ""
+
+
+def image_text_score(text):
+    compact = re.sub(r"\s+", "", text or "")
+    cjk_count = len(re.findall(r"[\u3400-\u9fff]", text or ""))
+    return len(compact) + 2 * cjk_count
+
+
+def choose_image_rotation(texts):
+    scores = {angle: image_text_score(text) for angle, text in texts.items()}
+    current = scores.get(0, 0)
+    best_angle = max(scores, key=lambda angle: (scores[angle], angle == 0))
+    best = scores[best_angle]
+    if best_angle == 0 or best < 80:
+        return 0
+    gain = best - current
+    if current < 80:
+        return best_angle if gain >= 40 else 0
+    if best < 500:
+        return best_angle if gain >= 35 and best >= current * 1.25 else 0
+    return best_angle if gain >= 100 and best >= current * 1.035 else 0
+
+
+def image_text_with_orientation(path):
+    try:
+        from PIL import Image, ImageOps
+    except Exception:
+        return "", 0
+    texts = {}
+    try:
+        with Image.open(path) as opened:
+            original = ImageOps.exif_transpose(opened)
+            for angle in (0, 90, 180, 270):
+                candidate = (
+                    original
+                    if angle == 0
+                    else original.rotate(angle, expand=True)
+                )
+                texts[angle] = ocr_image(candidate)
+    except Exception:
+        return "", 0
+    angle = choose_image_rotation(texts)
+    return texts.get(angle, texts.get(0, "")), angle
+
+
+def extract_image(path):
+    text, _ = image_text_with_orientation(path)
+    return text
+
+
+def rotate_image_in_place(path, angle):
+    try:
+        from PIL import Image, ImageOps
+    except Exception as exc:
+        raise RuntimeError("图片方向纠正需要Pillow") from exc
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            suffix=path.suffix.lower(),
+            prefix="organize-files-rotated-",
+            dir=str(path.parent),
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+        with Image.open(path) as opened:
+            original_format = opened.format
+            image = ImageOps.exif_transpose(opened)
+            rotated = image.rotate(angle, expand=True)
+            save_options = {}
+            if opened.info.get("icc_profile"):
+                save_options["icc_profile"] = opened.info["icc_profile"]
+            rotated.save(temporary, format=original_format, **save_options)
+        if not temporary.is_file() or temporary.stat().st_size == 0:
+            raise RuntimeError("图片方向纠正失败")
+        temporary.replace(path)
+    finally:
+        if temporary and temporary.exists():
+            temporary.unlink()
 
 
 def extract_text(path):
@@ -318,9 +677,16 @@ def resolve_layout(config):
     if not isinstance(root_value, str) or not root_value.strip():
         raise ValueError("root_folder必须是使用者确认的完整路径字符串")
     root = expand_path(root_value)
+    try:
+        schema_version = int(config.get("schema_version", 0))
+    except (TypeError, ValueError):
+        schema_version = 0
     inbox = configured_child(
         root,
-        config.get("inbox_name", "待智能整理"),
+        config.get(
+            "inbox_name",
+            "00_待归档" if schema_version >= 3 else "待智能整理",
+        ),
         "inbox_name",
     )
     return root, inbox, archive_root(root, config)
@@ -337,7 +703,14 @@ def load_config(path):
     missing = [key for key in required if key not in config]
     if missing:
         raise ValueError("配置缺少字段：" + "、".join(missing))
-    config.setdefault("inbox_name", "待智能整理")
+    try:
+        schema_version = int(config.get("schema_version", 0))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("schema_version无效") from exc
+    config.setdefault(
+        "inbox_name",
+        "00_待归档" if schema_version >= 3 else "待智能整理",
+    )
     config.setdefault("archive_name", ".")
     config.setdefault("ignore_patterns", [])
     config.setdefault("naming", {})
@@ -435,6 +808,23 @@ def load_config(path):
     return config
 
 
+def validate_media_processing_authorization(config):
+    media = config.get("media_processing")
+    if not isinstance(media, dict):
+        raise ValueError("schema_version 3实际执行需要media_processing授权")
+    actions = media.get("authorized_actions")
+    if (
+        not isinstance(actions, list)
+        or any(not isinstance(value, str) for value in actions)
+    ):
+        raise ValueError("media_processing.authorized_actions缺失或格式无效")
+    missing = sorted(MEDIA_ACTIONS - set(actions))
+    if missing:
+        raise ValueError("媒体处理缺少明确授权：" + "、".join(missing))
+    if not confirmed_text(media.get("confirmed_at")):
+        raise ValueError("媒体处理缺少一次性用户确认时间")
+
+
 def validate_apply_authorization(config, root=None):
     try:
         schema_version = int(config.get("schema_version", 0))
@@ -442,6 +832,8 @@ def validate_apply_authorization(config, root=None):
         raise ValueError("schema_version无效") from exc
     if schema_version < 2:
         raise ValueError("实际执行要求schema_version为2；旧配置只能预演，确认后再重建")
+    if schema_version >= 3:
+        validate_media_processing_authorization(config)
 
     scope = config.get("scope_context")
     if not isinstance(scope, dict):
@@ -1890,6 +2282,373 @@ def evidence_sources(root, inbox, source, text, title, metadata, config):
     }
 
 
+def classification_route_signature(classification):
+    return tuple(
+        classification.get(key, "")
+        for key in (
+            "track", "parent", "project", "work_domain",
+            "workstream", "workstream_folder", "category",
+        )
+    )
+
+
+def inspect_archive_member(root, config, inbox, source):
+    if source.suffix.lower() not in SUPPORTED or source.name.startswith("~$"):
+        return None, ""
+    try:
+        text, title, metadata = extract_text(source)
+    except Exception as exc:
+        return None, f"{source.name}正文读取失败：{type(exc).__name__}"
+    sources = evidence_sources(
+        root,
+        inbox,
+        source,
+        text,
+        title,
+        metadata,
+        config,
+    )
+    combined = normalize("\n".join(sources.values()))
+    if len(re.sub(r"\s", "", combined)) < 6:
+        return None, f"{source.name}未提取到足够文字"
+    classification, reason = classify(config, sources)
+    if not classification:
+        return None, f"{source.name}{reason}"
+    date_label, date_basis = detect_date(
+        source,
+        text,
+        False,
+        metadata,
+    )
+    version, version_rank = detect_version(source.stem)
+    subject = clean_subject(
+        source,
+        text,
+        title,
+        version,
+        date_label,
+    )
+    return {
+        "text": text,
+        "title": title,
+        "metadata": metadata,
+        "classification": classification,
+        "date_label": date_label,
+        "date_basis": date_basis,
+        "version": version,
+        "version_rank": version_rank,
+        "subject": subject,
+    }, ""
+
+
+def generic_archive_name(value):
+    compact = re.sub(r"[^0-9A-Za-z\u3400-\u9fff]+", "", value or "")
+    lowered = compact.lower()
+    return (
+        not compact
+        or lowered in GENERIC_NAMES
+        or bool(re.fullmatch(r"[0-9a-f]{16,}", lowered))
+        or bool(re.fullmatch(r"(?:download|archive|zip|file)\d*", lowered))
+        or bool(re.fullmatch(r"(?:附件|材料|文件|压缩包)\d*", compact))
+    )
+
+
+def safe_archive_package_name(source, representative):
+    original = normalize(archive_stem(source))
+    original = re.sub(r'[/:*?"<>|]+', "_", original)
+    original = re.sub(r"\s+", " ", original).strip(" ._")
+    if original and not generic_archive_name(original):
+        return sanitize(original, 100)
+    classification = representative["classification"]
+    pieces = [
+        representative.get("subject", ""),
+        classification.get("category", ""),
+        representative.get("date_label", ""),
+    ]
+    return sanitize(
+        "_".join(piece for piece in pieces if piece),
+        100,
+    ) or "解压材料包"
+
+
+def append_index_rows_atomic(index_path, rows, new_rows):
+    combined = [
+        {field: row.get(field, "") for field in INDEX_FIELDS}
+        for row in rows
+    ]
+    combined.extend(new_rows)
+    for number, row in enumerate(combined, 1):
+        row["序号"] = str(number)
+    write_index(index_path, combined)
+
+
+def archive_package(root, config, source, apply):
+    original = relative(source, root)
+    guide = ensure_within_root(
+        root,
+        archive_root(root, config) / "00_整理说明",
+        "整理说明目录",
+        allow_root=False,
+    )
+    index_path = ensure_within_root(
+        root,
+        guide / "文件索引.csv",
+        "文件索引",
+        allow_root=False,
+    )
+    rows = read_index(index_path)
+    source_digest = sha256(source)
+    duplicate = next(
+        (
+            row for row in rows
+            if row.get("SHA-256") == source_digest
+            and row.get("状态") == "原始压缩包"
+            and row.get("新路径")
+            and configured_child(
+                root,
+                row["新路径"],
+                "索引中的压缩包路径",
+            ).is_file()
+        ),
+        None,
+    )
+    if duplicate:
+        target, reason = move_pending(
+            root,
+            config,
+            source,
+            "发现内容完全相同的已归档压缩包；不删除或覆盖，请人工确认",
+            apply,
+            digest=source_digest,
+            rows=rows,
+            index_path=index_path,
+        )
+        return "待人工选择", target, reason
+    try:
+        schema_version = int(config.get("schema_version", 0))
+        if apply and schema_version < 3:
+            target, reason = move_pending(
+                root,
+                config,
+                source,
+                "压缩包已识别；旧版schema 2未授权自动解压，"
+                "请升级配置并确认media_processing",
+                True,
+                digest=source_digest,
+                rows=rows,
+                index_path=index_path,
+            )
+            return "待人工选择", target, reason
+        with tempfile.TemporaryDirectory(
+            prefix="organize-files-archive-"
+        ) as temporary:
+            temporary_root = Path(temporary)
+            extracted = temporary_root / "extracted"
+            extract_archive_safely(source, extracted)
+            expand_nested_archives(extracted)
+            validate_extracted_tree(extracted)
+            files = [
+                path for path in extracted.rglob("*")
+                if path.is_file()
+                and not archive_junk(path.relative_to(extracted).parts)
+            ]
+            if not files:
+                raise ValueError("压缩包解压后没有可识别文件")
+            unsafe = [
+                path.relative_to(extracted)
+                for path in files
+                if path.suffix.lower() in UNSAFE_PACKAGE_SUFFIXES
+                or (path.stat().st_mode & 0o111)
+            ]
+            if unsafe:
+                raise ValueError(
+                    "压缩包包含程序、脚本或可执行文件："
+                    + "、".join(str(path) for path in unsafe[:3])
+                )
+            inbox = configured_child(
+                root,
+                config.get("inbox_name", "待智能整理"),
+                "inbox_name",
+            )
+            analyses = {}
+            blockers = []
+            for path in files:
+                analysis, reason = inspect_archive_member(
+                    root,
+                    config,
+                    inbox,
+                    path,
+                )
+                relative_path = path.relative_to(extracted)
+                if analysis:
+                    analyses[relative_path] = analysis
+                elif path.suffix.lower() in SUPPORTED:
+                    blockers.append(reason or f"{path.name}无法识别")
+            if not analyses:
+                raise ValueError("压缩包内没有可识别的业务文件")
+            if blockers and len(analyses) < 2:
+                raise ValueError(
+                    "包内可独立识别的主件不足，无法带动其他附件归档："
+                    + "；".join(blockers[:3])
+                )
+            routes = {
+                classification_route_signature(value["classification"])
+                for value in analyses.values()
+            }
+            if len(routes) != 1:
+                raise ValueError("包内可识别业务文件的归档路线不一致")
+            representative = sorted(
+                analyses.values(),
+                key=lambda value: (
+                    value.get("date_label", ""),
+                    value.get("date_basis", ""),
+                ),
+            )[-1]
+            directory = target_directory(
+                root,
+                config,
+                representative["classification"],
+                representative["date_label"],
+            )
+            package_name = safe_archive_package_name(
+                source,
+                representative,
+            )
+            target = ensure_within_root(
+                root,
+                directory / package_name,
+                "压缩材料包目标目录",
+                allow_root=False,
+            )
+            if target.exists():
+                raise ValueError(
+                    f"目标材料包已存在：{relative(target, root)}"
+                )
+            reason = (
+                f"已安全解压并识别{len(files)}个文件，"
+                f"{len(analyses)}个业务文件一致归入"
+                f"{'/'.join(value for value in next(iter(routes)) if value)}"
+            )
+            if blockers:
+                reason += f"，另有{len(blockers)}个文件按包内附件保留"
+            if not apply:
+                return "压缩包归档", target, reason
+
+            staged_package = temporary_root / "package"
+            original_directory = staged_package / "00_原始压缩包"
+            content_directory = staged_package / "01_解压内容"
+            original_directory.mkdir(parents=True)
+            content_directory.mkdir(parents=True)
+            original_copy = original_directory / source.name
+            shutil.copy2(source, original_copy)
+            for extracted_file in files:
+                member = extracted_file.relative_to(extracted)
+                staged_file = content_directory / member
+                staged_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(extracted_file, staged_file)
+            if sha256(original_copy) != source_digest:
+                raise RuntimeError("原始压缩包复制后哈希校验失败")
+
+            directory.mkdir(parents=True, exist_ok=True)
+            moved = False
+            index_written = False
+            try:
+                shutil.move(str(staged_package), str(target))
+                moved = True
+                original_target = target / "00_原始压缩包" / source.name
+                index_rows = [
+                    decision_index_row(
+                        root,
+                        original,
+                        original_target,
+                        "原始压缩包",
+                        (
+                            "名称已合规"
+                            if package_name == archive_stem(source)
+                            else "已按内容改名"
+                        ),
+                        reason,
+                        original_target.stat().st_size,
+                        source_digest,
+                        classification=representative["classification"],
+                        date_label=representative["date_label"],
+                    )
+                ]
+                for extracted_file in files:
+                    member = extracted_file.relative_to(extracted)
+                    final_file = target / "01_解压内容" / member
+                    analysis = analyses.get(member)
+                    if analysis:
+                        classification = analysis["classification"]
+                        status = "压缩包内主件"
+                        summary = analysis["text"]
+                        date_label = analysis["date_label"]
+                        version = analysis["version"]
+                        member_reason = (
+                            "压缩包内业务主件；"
+                            + "、".join(classification["evidence"][:8])
+                        )
+                        key = search_key(
+                            classification,
+                            analysis["subject"],
+                            final_file.suffix,
+                        )
+                    else:
+                        classification = representative["classification"]
+                        status = "压缩包内附件"
+                        summary = ""
+                        date_label = representative["date_label"]
+                        version = ""
+                        member_reason = "随路线一致的压缩材料包整体归档"
+                        key = ""
+                    index_rows.append(
+                        decision_index_row(
+                            root,
+                            f"{original}!/{member}",
+                            final_file,
+                            status,
+                            "正式名称保护",
+                            member_reason,
+                            final_file.stat().st_size,
+                            sha256(final_file),
+                            text=summary,
+                            classification=classification,
+                            date_label=date_label,
+                            version=version,
+                            key=key,
+                        )
+                    )
+                append_index_rows_atomic(index_path, rows, index_rows)
+                index_written = True
+            except Exception:
+                if moved and not index_written and target.exists():
+                    shutil.rmtree(target)
+                raise
+            try:
+                source.unlink()
+            except OSError:
+                reason += "；原投放文件未能移除，请人工清理"
+            return "压缩包归档", target, reason
+    except (
+        OSError,
+        RuntimeError,
+        tarfile.TarError,
+        zipfile.BadZipFile,
+        ValueError,
+    ) as exc:
+        target, reason = move_pending(
+            root,
+            config,
+            source,
+            f"压缩包识别失败：{exc}",
+            apply,
+            digest=source_digest,
+            rows=rows,
+            index_path=index_path,
+        )
+        return "待人工选择", target, reason
+
+
 def archive_one(root, config, source, apply):
     source = ensure_within_root(
         root,
@@ -2028,6 +2787,9 @@ def archive_one(root, config, source, apply):
             )
         return "运行依赖", source, ignore_detail
 
+    if archive_suffix(source):
+        return archive_package(root, config, source, apply)
+
     if source.suffix.lower() not in SUPPORTED:
         target, reason = move_pending(
             root,
@@ -2040,6 +2802,32 @@ def archive_one(root, config, source, apply):
             index_path=index_path,
         )
         return "待人工选择", target, reason
+
+    prepared_text = None
+    prepared_title = ""
+    prepared_metadata = {}
+    orientation_note = ""
+    if source.suffix.lower() in IMAGE_SUFFIXES:
+        prepared_text, rotation = image_text_with_orientation(source)
+        if rotation:
+            orientation_label = {
+                90: "逆时针90°",
+                180: "180°",
+                270: "顺时针90°",
+            }[rotation]
+            schema_version = int(config.get("schema_version", 0))
+            if apply and schema_version >= 3:
+                rotate_image_in_place(source, rotation)
+                source_stat = source.stat()
+                digest = sha256(source)
+                orientation_note = f"图片已{orientation_label}纠正方向"
+            elif apply:
+                orientation_note = (
+                    f"检测到图片应{orientation_label}纠正；"
+                    "schema 2未授权修改图片，保持原图"
+                )
+            else:
+                orientation_note = f"预演：图片将{orientation_label}纠正方向"
 
     duplicate = next(
         (
@@ -2137,7 +2925,12 @@ def archive_one(root, config, source, apply):
         return status, target, "内容完全相同；只保留修改时间较新的一份"
 
     try:
-        text, title, metadata = extract_text(source)
+        if prepared_text is None:
+            text, title, metadata = extract_text(source)
+        else:
+            text = prepared_text
+            title = prepared_title
+            metadata = prepared_metadata
     except Exception as exc:
         reason = (
             f"正文读取失败：{type(exc).__name__}；"
@@ -2368,6 +3161,8 @@ def archive_one(root, config, source, apply):
         ) + "SHA-256相同，但既有副本具有包或用途上下文；当前文件另行归档"
     if date_basis:
         evidence = (evidence + "；" if evidence else "") + f"日期依据:{date_basis}"
+    if orientation_note:
+        evidence = (evidence + "；" if evidence else "") + orientation_note
     if apply:
         persist_index_row(
             index_path,
@@ -2392,8 +3187,14 @@ def archive_one(root, config, source, apply):
 
 
 def ignored_reason(path, config):
-    if path.name.startswith(".") or path.name in SYSTEM_METADATA_NAMES:
+    if (
+        path.name.startswith(".")
+        or path.name in SYSTEM_METADATA_NAMES
+        or re.fullmatch(r"Icon\r(?:_\d+)?", path.name)
+    ):
         return "系统、隐藏或运行元数据文件；保持原位"
+    if path.name.startswith("~$"):
+        return "Office临时锁定文件；保持原位，不计入业务待确认"
     for pattern in config["ignore_patterns"]:
         if fnmatch.fnmatch(path.name, pattern):
             return f"匹配暂不处理规则：{pattern}；保持原位"

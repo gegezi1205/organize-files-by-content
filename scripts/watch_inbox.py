@@ -127,7 +127,7 @@ def indexed_runtime_dependency(index_path, root, source):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="跨平台监控待智能整理投放箱")
+    parser = argparse.ArgumentParser(description="跨平台监控已配置的自动投放箱")
     parser.add_argument("--config", required=True, help="整理配置JSON完整路径")
     parser.add_argument("--interval", type=float, default=5, help="扫描间隔秒数")
     parser.add_argument("--stable-cycles", type=int, default=2, help="连续稳定次数")
