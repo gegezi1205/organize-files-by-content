@@ -19,7 +19,7 @@ CONFIGURATION_REFERENCE = SCRIPT_DIR.parent / "references" / "configuration.md"
 CLASSIFICATION_REFERENCE = (
     SCRIPT_DIR.parent / "references" / "personal-classification-model.md"
 )
-SKILL_REFERENCE = SCRIPT_DIR.parent / "SKILL.md"
+SKILL_REFERENCE = SCRIPT_DIR.parent / "references" / "organize-workflow.md"
 VERSION_FILE = SCRIPT_DIR.parent / "VERSION"
 OPENAI_METADATA = SCRIPT_DIR.parent / "agents" / "openai.yaml"
 EVALS_FILE = SCRIPT_DIR.parent / "evals" / "evals.json"
@@ -54,7 +54,7 @@ def run(config_path, source):
 
 
 def main():
-    assert VERSION_FILE.read_text(encoding="utf-8").strip() == "1.5.0"
+    assert VERSION_FILE.read_text(encoding="utf-8").strip() == "1.5.1"
     configuration_reference = CONFIGURATION_REFERENCE.read_text(
         encoding="utf-8"
     )

@@ -2,9 +2,11 @@
 
 [![skills.sh](https://skills.sh/b/gegezi1205/organize-files-by-content)](https://skills.sh/gegezi1205/organize-files-by-content)
 
-An Agent Skill that organizes files around their purpose, existing structure, and the way you look for them. It shows every proposed change before it touches a file.
+Drop new files into `00_待归档`. After you approve the filing rules and enable the inbox, files that fit an approved rule are renamed, filed where you already look for them, and added to the index. Unclear files stay in the inbox.
 
-Current version: `1.5.0`
+把新文件放进 `00_待归档`。分类规则确认并启用投放箱后，去向明确的会自动改名、归档并写进索引；说不清去处的文件留在投放箱。
+
+Current version: `1.5.1`
 
 ```bash
 npx skills add gegezi1205/organize-files-by-content
@@ -22,32 +24,45 @@ Installs with the [skills CLI](https://skills.sh/) into your agent's skills dire
 
 ## English
 
-### A note from the author
+### Put new files in one place
 
-I’m new to building Agent Skills, and this is my first one. I tried it with a few people in different professions; the results were encouraging, so I’m taking the liberty of sharing it here in the hope that it helps others.
+Work files turn up in chat, email, OA exports, shared folders, and meeting follow-ups. A few busy days are enough to fill the Desktop or Downloads folder with copies and half-finished names.
 
-I built this Skill for a familiar kind of office clutter. A file arrives in a work chat and another as an email attachment. A meeting leaves behind several temporary versions. The next task is waiting, so they land on the Desktop or in Downloads. When you return to the folder, even starting means making dozens of small decisions, so you put it off again.
+On the first run, the Skill looks at the folders and sample files you approve, then asks how you normally find old work: by project, task, person, or date. It uses those answers and the existing folder structure to draft filing rules for you to review. If the current folders already have a useful pattern, the rules keep it.
 
-Even a disorderly folder can make sense to the person who uses it. You may remember that the signed copy is somewhere on the right side of the Desktop, or that last month's proposal sits beside the meeting notes. A tool can replace that half-remembered layout with a tidy structure that feels unfamiliar. A job title rarely describes how the work is divided. People with the same title may support different teams and do different work.
+After you approve the rules and enable the inbox, drop new files into `00_待归档`. The organizer reads the document body and checks the title, author, date, current folder, and nearby files. Files that fit an approved rule are renamed, filed, and added to the index. If two destinations still make sense, the file stays in the inbox.
 
-This Skill asks a few simple questions at the start. When you look for an old file, do you think first of the project, what it was for, the person involved, or the date? It then considers where the file already sits, what is beside it, and what the document is used for. Your occupation and role help the Agent choose questions that fit your work. The Agent does not turn a job title into the folder tree.
+![New files enter through 00_待归档](assets/skillhub-01-drop-and-file.png)
 
-The Skill keeps any useful pattern in the old folders. If there is no pattern to follow, it offers a few cautious ways to begin and shows how each would work on a small group of files. It shows every change before it moves anything, and uncertain files stay in place. I want it to turn a folder you have put off for too long into an arrangement you still recognise and will keep using.
+*New files enter through `00_待归档`. Files that fit an approved rule are filed; unclear files stay there.*
 
-### How it works
+The filename is only one clue. The setup also considers who sent the file, who needs it, why it is being kept, where related material already lives, and whether any of those details conflict.
+
+![The information used to decide where a file belongs](assets/skillhub-02-how-it-decides.png)
+
+*The diagram lists the Chinese labels used during setup: body text, sender, recipient, current location, nearby files, reason for keeping it, version, and conflicting details.*
+
+Meeting packs, submission packs, evidence sets, and archives stay together. Formal filenames stay unchanged when renaming would damage a reference or package.
+
+![Packages and formal material kept intact](assets/skillhub-03-what-it-protects.png)
+
+*Packages stay intact, formal names are protected, text images are rotated only when one orientation produces clearly better OCR text, and each decision is recorded in the index.*
+
+### How it decides where a file belongs
 
 You can use the Skill on a Desktop, Downloads folder, existing work folders, personal reference material, or a shared folder where you have clear permission. Each location is reviewed and authorized on its own.
 
 The Agent checks:
 
 - the folders and naming habits already in use;
-- the file's purpose and the people or organizations named in it;
-- dates found in the document, formal metadata, or a reliable filename;
-- the role of identical files inside packages, evidence sets, and other established folders.
+- the document body, its purpose, and the people or organizations involved;
+- the title, author, and date stored in the document, plus any reliable date in the filename;
+- the role of a file inside a package or established folder;
+- details that point to a different destination.
 
-It also separates who produced the file, what it is about, what kind of document it is, how it relates to your work, why you keep it, and any evidence that conflicts. A repeated keyword is not treated as several independent clues, and a missing role-specific term does not by itself make a file an external reference.
+A sender or author does not automatically determine the destination. The Agent also checks what the document is for, why it is kept, and what sits beside it. Repeating the same keyword does not count as extra evidence. A missing role-specific term does not by itself make a file an external reference.
 
-With explicit media authorization, ZIP and TAR archives are safely extracted with built-in checks, while 7Z and RAR use a detected `bsdtar` or 7-Zip tool. Consistent business packages remain together with the original archive and relative structure; conflicting packages stay intact for review. JPEG, PNG, and WebP text images are rotated only when four-way OCR has a clear winner, then renamed and re-hashed from the corrected content.
+If you separately allow media processing, ZIP and TAR archives are extracted with built-in safety checks, while 7Z and RAR use a detected `bsdtar` or 7-Zip tool. If the files in an archive belong together, the original archive and its folder structure stay together. If they point to different destinations, the whole archive waits for review. JPEG, PNG, and WebP text images are rotated only when one orientation produces clearly better OCR text. The corrected file is then renamed and hashed again.
 
 The first questions take your job into account. The folder plan comes from the files, existing structure, and your answers.
 
@@ -59,7 +74,7 @@ The default naming pattern is:
 
 `subject_or_project_specific_item_material_type_version_date.ext`
 
-Your existing convention takes priority. The organizer looks for dates in the document or cover, then in formal metadata, and finally in a reliable filename. It ignores file-system modification time when choosing a document date. Automatic names use month-level precision at most. Formal names remain unchanged when a rename could break a reference, package, or runtime dependency.
+Your existing convention takes priority. The organizer looks for dates in the document or cover, then at the date stored inside the file, and finally in a reliable filename. It ignores file-system modification time when choosing a document date. Automatic names use month-level precision at most. Formal names remain unchanged when a rename could break a reference, package, or runtime dependency.
 
 ### A safe first run
 
@@ -87,9 +102,9 @@ The files in `prompts/` provide product-neutral installation and usage guidance.
 
 ### Safety boundaries
 
-Preview is the default. Before accepting `--apply`, the all-in-one organizer checks the profile, scope, permissions, full preview, and every open question. Execution requires an explicit confirmation.
+Preview is the default. Before accepting `--apply`, the built-in organizer checks the profile, scope, permissions, full preview, and every open question. Execution requires an explicit confirmation.
 
-One run may read, rename, move, write the index, and handle duplicates. The configuration therefore needs `read`, `rename`, `move`, and `deduplicate`. For a smaller permission set, remain in preview or ask the Agent to perform the approved actions without the all-in-one script.
+One run may read, rename, move, write the index, and handle duplicates. The configuration therefore needs `read`, `rename`, `move`, and `deduplicate`. For a smaller permission set, remain in preview or ask the Agent to perform the approved actions without the built-in script.
 
 Ambiguous, unsupported, encrypted, damaged, syncing, cloud-only, and unreadable files stay where they are with a recorded reason. An unreadable file blocks a completion report.
 
@@ -132,6 +147,7 @@ The self-test uses temporary synthetic files and covers known regressions. Real 
 .
 ├── SKILL.md
 ├── VERSION
+├── assets/
 ├── agents/
 ├── references/
 ├── scripts/
@@ -143,16 +159,18 @@ The self-test uses temporary synthetic files and covers known regressions. Real 
 └── LICENSE
 ```
 
-- `SKILL.md`: workflow and safety rules
-- `agents/`: Agent-facing metadata
+- `SKILL.md`: short public overview and the entry point for execution
+- `assets/`: Chinese diagrams used on SkillHub and GitHub
+- `agents/`: Agent display and invocation settings
+- `references/organize-workflow.md`: complete workflow and safety rules
 - `references/`: configuration and decision details
 - `scripts/`: preview, organization, monitoring, and synthetic test tools
 - `evals/`: evaluation prompts
 - `prompts/`: product-neutral installation and usage guidance
 
-### Version 1.5.0
+### Version 1.5.1
 
-Version `1.5.0` adds safe archive-package handling, text-image orientation correction, schema 3 media authorization, and a new default inbox while preserving schema 2 compatibility. It retains the multi-dimensional classification and counter-evidence rules from 1.4.0. See [CHANGELOG.md](CHANGELOG.md).
+Version `1.5.1` shortens the public overview, adds three Chinese diagrams, and moves the complete execution rules into `references/organize-workflow.md`. Organizer behavior, safety checks, and evaluations are unchanged. See [CHANGELOG.md](CHANGELOG.md).
 
 ### Contributing
 
@@ -162,27 +180,23 @@ Issues and pull requests are welcome. Please include a small synthetic example, 
 
 ## 中文
 
-### 作者的话
+### 新文件放进 `00_待归档`
 
-我是 Skill 新人，这是我做的第一个 Skill。找了几位不同职业的朋友做过试用，整体表现尚可，所以斗胆公开出来，希望能给大家一点帮助。
+微信、邮件、OA 等处的材料，常常堆在桌面或下载目录。分类规则确认并启用投放箱后，新文件放进 `00_待归档`，去向明确的会自动改名、归档并写进索引；说不清去处的先留在投放箱。
 
-我做这个 Skill，是因为文件常常在忙乱中越积越多：微信里下载一份文件，邮件里收一份附件，开完会又多出几个临时版本。手头还有事，先放桌面或下载目录，想着忙完再整理。可一件事刚结束，下一件又来了。等文件堆到一定程度，光是想到要逐个打开、判断、改名、归位，就已经不想动了。
+第一次使用时，它先看现有目录和几份真实文件，再确认你平时按项目、事项、人员还是时间找东西。判断文件放哪，会一起看正文、谁发来的、要交给谁、为什么留着、原来放在哪、旁边有哪些材料、时间和版本，也会留意这些信息有没有互相打架。文件名和扩展名只占一小部分，现有目录有能用的规律就沿用，不另塞一套陌生目录。正式执行前，改名和去向会完整列出，确认后才动。
 
-目录虽然乱，自己往往还记得个大概：某份盖章件在桌面右边，上个月的方案和会议纪要放在一起。工具如果换上一套陌生目录，这点把握也没有了。职业名称也概括不了日常工作。同一个职位，在不同团队里负责的事情可能差得很远。
-
-这个 Skill 开始时会问几个简单问题：平时找材料，会先想项目、用途、相关的人或单位，还是时间？随后再看文件原来放在哪里、旁边有哪些材料、正文讲的是什么；有几种放法都说得通时，由本人选择。职业和职位会影响问题怎么问，Agent 不会据此直接套目录。
-
-原有目录有一套能用的思路，就尽量沿用。确实没有规律时，再给出几种稳妥的分法，先拿一小部分文件预览效果。所有变化都会完整列出来，确认后才执行；拿不准的文件留在原处。我希望它能把已经堆到不想动的文件，整理成你自己仍然认得、以后也愿意继续用的样子。
+会议包、报送包、证据包和压缩包按整套材料处理；正式文件名不会为了整齐被改写。文字图片如果倒着或横着，会比较四个方向，只有其中一个读得明显更清楚才转正。两处都说得通的文件不动，等你选择。
 
 ### 整理时会看哪些信息
 
 桌面、下载目录、长期使用的工作资料、个人参考资料和权限明确的共享文件夹都可以纳入整理。多个位置需要分别确认范围和权限。
 
-Agent 先看原有目录和命名习惯，再读文件名、正文和正式元数据。材料中出现单位名称时，还要分清它是作者、发起方、接收方，还是文中提到的业务对象。日期依次取自正文或封面、正式元数据和可靠的原文件名。
+Agent 先看原有目录和命名习惯，再读文件名、正文，以及文件本身保存的标题、作者和日期。材料中出现单位名称时，还要分清它是作者、发起方、接收方，还是文中提到的业务对象。日期依次取自正文或封面、文件本身保存的日期和可靠的原文件名。
 
-还会把来源角色、业务对象、材料体裁、责任流向、关联层级、留存用途、稳定上下文和反证分开判断。同一个关键词重复出现不算多个判断维度；没有出现本岗位专业词，也不能直接把材料归为外部参考。
+判断时会把几件事分开：谁发来的、正文讲什么、要交给谁、这份材料为什么要留、原来放在哪、旁边有哪些文件、是哪一版，以及这些信息有没有互相对不上。一个关键词重复出现几次，不会因此变成几条理由；没写岗位术语，也不等于只是外部参考。
 
-得到单独的媒体处理授权后，ZIP、TAR、7Z、RAR 会先按安全边界解压，再逐个识别包内主件。业务路线一致时保留原压缩包和相对结构整包归档，路线冲突时整包等待选择。JPEG、PNG、WebP 会比较四个方向的文字识别结果，只有优势明确时纠正方向，并按旋转后的内容重新命名、计算大小和哈希。
+得到单独的媒体处理授权后，ZIP、TAR、7Z、RAR 会先按安全边界解压，再逐个读取包内主要文件。整包材料指向同一件事时，保留原压缩包和相对结构一起归档；内容指向两个不同去处时，整包等待选择。JPEG、PNG、WebP 会比较四个方向的文字识别结果，只有优势明确时纠正方向，并按旋转后的内容重新命名、计算大小和哈希。
 
 内容相同的文件也要查看各自所在的位置。会议包、证据包或报送包里的副本通常承担着结构和留痕作用，整理时会按材料包用途保留。
 
@@ -194,7 +208,7 @@ Agent 先看原有目录和命名习惯，再读文件名、正文和正式元�
 
 `主题或项目_具体事项_材料性质_版本_日期.ext`
 
-已有命名习惯优先。材料日期从正文或封面开始查找，其次是正式元数据和可靠的原文件名。文件系统的修改时间不参与材料日期判断，自动命名最多写到月份。涉及引用、材料包结构或程序依赖时，文件继续使用原来的正式名称。
+已有命名习惯优先。材料日期从正文或封面开始查找，其次是文件本身保存的日期和可靠的原文件名。文件系统的修改时间不参与材料日期判断，自动命名最多写到月份。涉及引用、材料包结构或程序依赖时，文件继续使用原来的正式名称。
 
 ### 第一次使用
 
@@ -267,6 +281,7 @@ python -m json.tool evals/evals.json >/dev/null
 .
 ├── SKILL.md
 ├── VERSION
+├── assets/
 ├── agents/
 ├── references/
 ├── scripts/
@@ -278,16 +293,18 @@ python -m json.tool evals/evals.json >/dev/null
 └── LICENSE
 ```
 
-- `SKILL.md`：工作流程与安全规则
-- `agents/`：Agent 元数据
+- `SKILL.md`：简短公开概述和执行入口
+- `assets/`：SkillHub 与 GitHub 使用的中文说明图
+- `agents/`：Agent 的显示与调用配置
+- `references/organize-workflow.md`：完整流程与安全规则
 - `references/`：配置与判断细则
 - `scripts/`：预演、整理、监控和合成自测工具
 - `evals/`：评测提示
 - `prompts/`：不绑定具体产品的安装与使用说明
 
-### 1.5.0 版本
+### 1.5.1 版本
 
-`1.5.0` 增加安全压缩包、文字图片方向纠正、schema 3 媒体授权和新的默认投放箱，并兼容 schema 2；同时保留 1.4.0 的多维分类和反证检查。详见 [CHANGELOG.md](CHANGELOG.md)。
+`1.5.1` 精简公开概述，增加三张中文说明图，并把完整执行规则移到 `references/organize-workflow.md`。整理脚本、安全检查和评测均未改变。详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### 贡献方式
 

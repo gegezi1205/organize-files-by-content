@@ -1,6 +1,6 @@
-通用文件智能整理 Skill｜通用 Agent 安装包
+按内容整理与自动归档 Skill｜通用 Agent 安装包
 
-版本：1.5.0
+版本：1.5.1
 
 本包不默认任何具体 Agent。只有能够安装或发现本地 Skill，并获得用户授权访问本地文件的 Agent，才可以执行整理。
 
@@ -27,6 +27,6 @@
 安装包结构：
 
 - organize-files-by-content/：Skill 主体
-- SKILL_INTRO.txt：建议中文显示名称、详细中文简介和归类依据
-- 01_只安装Skill_提示词.txt：只安装、适配当前 Agent、设置中文元数据、完成 Skills 归类和验证
+- SKILL_INTRO.txt：建议中文显示名称、SkillHub 展示文案、说明图和归类依据
+- 01_只安装Skill_提示词.txt：只安装、适配当前 Agent、设置中文名称和简介、完成 Skills 归类和验证
 - 02_安装完成后_选择范围并整理到桌面_提示词.txt：确认来源与身份画像后，再预览和执行
